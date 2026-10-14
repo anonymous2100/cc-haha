@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { parse } from 'yaml'
 
 type WorkflowJob = {
@@ -44,7 +44,8 @@ describe('PR quality workflow', () => {
     expect(workflow).toContain("if: needs.scope-plan.outputs.adapter_checks == 'true'")
     expect(workflow).toContain("if: needs.scope-plan.outputs.desktop_native_checks == 'true'")
     expect(workflow).toContain("if: needs.scope-plan.outputs.docs_checks == 'true'")
-    expect(workflow).toContain("if: needs.scope-plan.outputs.coverage_checks == 'true'")
+    expect(workflow).toContain("if: github.event_name == 'pull_request' && needs.scope-plan.outputs.coverage_checks == 'true'")
+    expect(workflow).toContain("if: needs.scope-plan.outputs.agent_e2e_checks == 'true'")
   })
 
   test('installs frozen dependencies before policy regressions without blocking product routing', () => {
@@ -63,6 +64,7 @@ describe('PR quality workflow', () => {
       'provider-contract-checks',
       'chat-contract-checks',
       'agent-flow-checks',
+      'agent-e2e-checks',
       'adapter-checks',
       'desktop-native-checks',
       'macos-swift-checks',
@@ -95,6 +97,27 @@ describe('PR quality workflow', () => {
       expect(ripgrep).toBeGreaterThanOrEqual(0)
       expect(ripgrep).toBeLessThan(check)
     }
+  })
+
+  test('reads CODEOWNERS for the policy exemption from the base branch, not the PR', () => {
+    const jobs = workflowJobs(readFileSync('.github/workflows/pr-quality.yml', 'utf8'))
+    const runs = (jobs['scope-plan'].steps ?? []).map(step => step.run ?? '').join('\n')
+
+    expect(runs).toContain(`jq -r '.pull_request.user.login' "$GITHUB_EVENT_PATH" > author.txt`)
+    expect(runs).toContain('git show "origin/${BASE_REF}:.github/CODEOWNERS" > codeowners.txt')
+    expect(runs).toContain('--author-file author.txt --codeowners-file codeowners.txt')
+    expect(runs).not.toMatch(/cat \.github\/CODEOWNERS|--codeowners-file \.github\/CODEOWNERS/)
+  })
+
+  test('installs adapter dependencies before desktop checks compile the sidecar bundle', () => {
+    const steps = workflowJobs(readFileSync('.github/workflows/pr-quality.yml', 'utf8'))['desktop-checks'].steps ?? []
+    const check = steps.findIndex(step => step.run === 'bun run check:desktop')
+    const install = steps.findIndex(step =>
+      step['working-directory'] === 'adapters' && step.run === 'bun install --frozen-lockfile',
+    )
+    expect(check).toBeGreaterThanOrEqual(0)
+    expect(install).toBeGreaterThanOrEqual(0)
+    expect(install).toBeLessThan(check)
   })
 
   test('requires macOS Swift checks alongside the selected Linux native packaging lane', () => {
@@ -194,7 +217,84 @@ describe('PR quality workflow', () => {
     expect(workflow).toContain('require_selected "provider-contract-checks"')
     expect(workflow).toContain('require_selected "chat-contract-checks"')
     expect(workflow).toContain('require_selected "agent-flow-checks"')
-    expect(workflow).toContain('require_selected "coverage-checks"')
+    expect(workflow).toContain('require_selected "agent-e2e-checks"')
+    // Coverage is reported, never blocking.
+    expect(workflow).toContain('advise_selected "coverage-checks"')
+    expect(workflow).not.toContain('require_selected "coverage-checks"')
+  })
+
+  test.each([
+    { coverage: 'failure', agentE2e: 'success', exit: 0 },
+    { coverage: 'success', agentE2e: 'success', exit: 0 },
+    { coverage: 'skipped', agentE2e: 'success', exit: 0 },
+    { coverage: 'success', agentE2e: 'failure', exit: 1 },
+    { coverage: 'success', agentE2e: 'skipped', exit: 1 },
+  ])('treats coverage as advisory and the mock-LLM agent lane as required: %j', scenario => {
+    const jobs = workflowJobs(readFileSync('.github/workflows/pr-quality.yml', 'utf8'))
+    const gateScript = jobs['pr-quality-gate']!.steps!.find(step => step.run?.includes('require_selected'))!.run!
+    const script = gateScript.replace(/\$\{\{\s*([^}]+?)\s*\}\}/g, (_match, expression: string) => {
+      if (expression === 'needs.scope-plan.outputs.coverage_checks') return 'true'
+      if (expression === 'needs.scope-plan.outputs.agent_e2e_checks') return 'true'
+      if (expression.startsWith('needs.scope-plan.outputs.')) return 'false'
+      if (expression === 'needs.coverage-checks.result') return scenario.coverage
+      if (expression === 'needs.agent-e2e-checks.result') return scenario.agentE2e
+      if (expression === 'needs.scope-plan.result' || expression === 'needs.policy-enforcement.result') return 'success'
+      return 'skipped'
+    })
+    const result = Bun.spawnSync(['bash', '-c', script], {
+      env: { PATH: process.env.PATH ?? '' },
+      stdout: 'pipe', stderr: 'pipe',
+    })
+    expect(result.exitCode, new TextDecoder().decode(result.stdout)).toBe(scenario.exit)
+  })
+
+  test('re-checks main after every merge, scoped to the pushed range', () => {
+    const workflow = readFileSync('.github/workflows/pr-quality.yml', 'utf8')
+    const parsed = parse(workflow) as { on: { push?: { branches?: string[] } } }
+    const jobs = workflowJobs(workflow)
+    const collect = (jobs['scope-plan'].steps ?? []).find((step) => step.name === 'Collect changed files')!.run!
+    const enforce = (jobs['policy-enforcement'].steps ?? []).find((step) => step.name === 'Enforce change policy')!.run!
+
+    expect(parsed.on.push?.branches).toEqual(['main'])
+    expect(collect).toContain('git diff --name-only "$PUSH_BEFORE" "$PUSH_AFTER"')
+    // Pushes to main must not cancel one another: each merge gets its own verdict.
+    expect(workflow).toContain("cancel-in-progress: ${{ github.event_name == 'pull_request' }}")
+    // Label exceptions live on the pull request; main must not re-block on them.
+    expect(enforce.indexOf('"$EVENT_NAME" != "pull_request"')).toBeLessThan(enforce.indexOf('"$BLOCKED" = "true"'))
+  })
+
+  test('routes the mock-LLM agent lane through the scope plan and keeps its evidence', () => {
+    const workflow = readFileSync('.github/workflows/pr-quality.yml', 'utf8')
+    const steps = workflowJobs(workflow)['agent-e2e-checks'].steps ?? []
+
+    expect(workflow).toContain('agent_e2e_checks: ${{ steps.policy.outputs.agent_e2e_checks }}')
+    expect(steps.some((step) => step.run === 'bun run check:agent-e2e')).toBe(true)
+    expect(workflow).toContain('path: artifacts/agent-e2e/')
+    expect(steps.some((step) => String(step.run ?? '').includes('secrets'))).toBe(false)
+  })
+
+  test('check:policy names only test files that exist, each as its own argument', () => {
+    // Two paths glued together ("a.test.ts./b.test.ts") silently drop both files
+    // from the run instead of failing it.
+    const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> }
+    const args = packageJson.scripts['check:policy']!.split(/\s+/).slice(2)
+    expect(args.length).toBeGreaterThan(20)
+    for (const arg of args) {
+      expect(arg, arg).toMatch(/^\.\/[^\s]+\.test\.ts$/)
+      expect(arg.slice(2).includes('./'), arg).toBe(false)
+      expect(existsSync(arg), arg).toBe(true)
+    }
+  })
+
+  test('replays recorded traffic in CI but never records it there', () => {
+    const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> }
+    // check:agent-e2e is what the agent-e2e job runs; it must include the replay lane.
+    expect(packageJson.scripts['check:agent-e2e']).toContain('scripts/quality-gate/replay/index.ts')
+    for (const file of ['.github/workflows/pr-quality.yml', '.github/workflows/nightly-quality.yml']) {
+      const workflow = readFileSync(file, 'utf8')
+      expect(workflow, file).not.toContain('record-cassettes')
+      expect(workflow, file).not.toContain('replay/record.ts')
+    }
   })
 
   test('routes the deterministic agent flow through the scope plan and keeps its evidence', () => {
@@ -218,14 +318,14 @@ describe('full quality workflow', () => {
     const runs = (jobs['full-deterministic'].steps ?? []).map((step) => step.run ?? '')
 
     expect(workflow).toContain('workflow_dispatch:')
-    // Manual only, and it stays that way. This sweep costs about ninety minutes of
-    // CI; when to spend that is the maintainer's decision, so a schedule must not
-    // reappear here without one.
-    expect(workflow).not.toContain('schedule:')
-    expect(workflow).not.toContain('cron:')
+    // Daily, by maintainer decision (2026-10). More often than that is a call for the
+    // maintainer, not for a drive-by edit: the sweep costs about ninety minutes.
+    const schedule = (parse(workflow) as { on: { schedule?: Array<{ cron: string }> } }).on.schedule ?? []
+    expect(schedule).toEqual([{ cron: '0 19 * * *' }])
     for (const command of [
       'bun run check:policy',
       'bun run check:agent-flow',
+      'bun run check:agent-e2e',
       'bun run check:server',
       'bun run check:provider-contract',
       'bun run check:chat-contract',
@@ -244,6 +344,22 @@ describe('full quality workflow', () => {
     expect(workflow.match(/persist-credentials: false/g)?.length).toBe(
       workflow.match(/uses: actions\/checkout@v4/g)?.length,
     )
+  })
+
+  test('installs ripgrep before every runtime suite in every workflow', () => {
+    // Agent and skill discovery lists files through ripgrep. A job that runs the
+    // runtime suites without it reports "create agent" as a 500, which kept the
+    // full sweep red on every run while the PR gate, which installs it, stayed green.
+    for (const file of ['.github/workflows/pr-quality.yml', '.github/workflows/nightly-quality.yml']) {
+      for (const [name, job] of Object.entries(workflowJobs(readFileSync(file, 'utf8')))) {
+        const steps = job.steps ?? []
+        const check = steps.findIndex(step => /\bcheck:(server|coverage|native)\b/.test(step.run ?? ''))
+        if (check < 0) continue
+        const ripgrep = steps.findIndex(step => step.run?.includes('apt-get install') && /\bripgrep\b/.test(step.run))
+        expect(ripgrep, `${file} ${name} must install ripgrep`).toBeGreaterThanOrEqual(0)
+        expect(ripgrep, `${file} ${name} must install ripgrep before its runtime suites`).toBeLessThan(check)
+      }
+    }
   })
 
   test('re-proves the dependency graph so PR selection cannot silently degrade', () => {

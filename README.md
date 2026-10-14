@@ -21,6 +21,20 @@
 
 cc-haha 是一个**桌面端 Claude Code 工作台**：多会话与全局搜索、分支 / Worktree 启动、Diff 审阅、内置浏览器预览、图形化权限审批、模型自选（Claude / ChatGPT / Grok / 预设 / 本地端点）、图片生成、MCP 与 SubAgent 可视化管理、Agent Teams 协作工作台、动态 Workflow 编排、模型请求追踪、Computer Use、技能市场、多主题、桌面宠物、H5 远程访问、IM 接入和定时任务，集中在一个 macOS / Windows / Linux APP 里。**在 macOS 上，Computer Use 能操作其他应用，同时不占用你的真实鼠标和键盘。**
 
+<p align="center"><b>白金赞助商 · Modelflare</b></p>
+
+<p align="center">
+  <a href="https://modelflare.dev/sign-up?utm_source=github&amp;utm_campaign=cchaha">
+    <img src="docs/images/sponsors/modelflare-banner-zh.png" width="720" alt="Modelflare：满血稳定不掺水，低成本享受全球 SOTA 模型">
+  </a>
+</p>
+
+<p><sub>感谢 <a href="https://modelflare.dev/sign-up?utm_source=github&amp;utm_campaign=cchaha">Modelflare</a> 赞助本项目！Modelflare：满血稳定不掺水，低成本享受全球 SOTA 模型。站点由美国 LLC 主体 Havenbyte LLC 运营，支持 GPT、Claude、Gemini、Grok 等主流模型和常用兼容协议，还支持 40 多种图片和视频模型。</sub></p>
+
+<p><sub><b>缓存补偿是一大亮点：</b>部分 OpenAI 价格优先、稳定和高级分组提供每日 65%、75%、85% 的缓存命中率保障，符合条件的请求没达到目标的，平台补偿差额，结算后可在用量看板查看。</sub></p>
+
+<p><sub><b>特惠活动：</b>单笔充值 US$20 即可解锁 0.015 倍价格倍率的 GPT 特惠分组，单笔充值 US$50 即可解锁 0.03 倍价格倍率的 Claude 特惠分组。通过 <a href="https://modelflare.dev/sign-up?utm_source=github&amp;utm_campaign=cchaha">专属链接注册</a>即可参与。</sub></p>
+
 <p align="center">
   <a href="#桌面端预览">桌面端预览</a> · <a href="#安装桌面端">安装桌面端</a> · <a href="#桌面端亮点">桌面端亮点</a> · <a href="#更多文档">更多文档</a> · <a href="#赞助与合作">赞助与合作</a> · <a href="#用户交流群">用户交流群</a>
 </p>
@@ -62,16 +76,6 @@ cc-haha 是一个**桌面端 Claude Code 工作台**：多会话与全局搜索�
       </td>
       <td valign="middle">
         感谢 <a href="https://aruhub.com/sign-up?aff=Z54g">AruHub</a> 对本项目的赞助！AruHub 专注为开发者提供长期稳定的主力 API 上游服务。面向 Codex / Claude Code 等高频 AI Coding 场景，提供 GPT 企业分组官方接口、Claude 稳定企业分组，适合长时间持续调用；同时覆盖 GPT、Claude 等主流模型。Image 2 / 2.5 全天稳定供应，低至 0.04 元/张。按量付费，支持企业大用量、开发票及退款。通过 <a href="https://aruhub.com/sign-up?aff=Z54g">专属链接</a>注册即送 1 美元全模型通用额度，不限制模型使用。
-      </td>
-    </tr>
-    <tr>
-      <td align="center" valign="middle">
-        <a href="https://www.apismart.ai">
-          <img src="docs/images/sponsors/apismart-logo.png" width="180" alt="ApiSmart">
-        </a>
-      </td>
-      <td valign="middle">
-        感谢 <a href="https://www.apismart.ai">ApiSmart</a> 赞助本项目！ApiSmart 通过单一 API 提供对主流 AI 模型的统一访问。只需一个 API Key，即可通过兼容 OpenAI 的接口连接大语言模型、图像模型和视频模型。轻松切换模型、简化账单管理，并通过智能路由和自动故障转移提升可靠性。
       </td>
     </tr>
   </tbody>
@@ -199,6 +203,7 @@ cp .env.example .env
 - [Electron](https://github.com/electron/electron)：跨端桌面应用能力与工程实践。
 - [cc-switch](https://github.com/farion1231/cc-switch)：模型供应商配置能力参考。
 - [LINUX DO](https://linux.do/)：新的理想型开发者社区。
+- [AtomGit](https://atomgit.com/NanmiCoder/cc-haha)：为本项目提供国内代码托管。
 
 ---
 

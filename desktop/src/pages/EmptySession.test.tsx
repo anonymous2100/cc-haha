@@ -959,6 +959,41 @@ describe('EmptySession', () => {
     })
   })
 
+  it('carries the global effort and the bundled DeepSeek model into the first draft selection for the DeepSeek Account', async () => {
+    const previous = useSettingsStore.getState()
+    const restoreSettings = {
+      effortLevel: previous.effortLevel,
+      currentModel: previous.currentModel,
+      activeProviderName: previous.activeProviderName,
+    }
+    useSettingsStore.setState({ effortLevel: 'high', currentModel: null, activeProviderName: 'DeepSeek Account' })
+    useProviderStore.setState({
+      providers: [],
+      activeId: 'deepseek-account',
+      providerOrder: ['claude-official', 'openai-official', 'grok-official', 'deepseek-account'],
+      hasLoadedProviders: true,
+    })
+
+    render(<EmptySession />)
+
+    setComposerText('draft question', 14)
+    fireEvent.click(screen.getByRole('button', { name: /Run/i }))
+
+    await waitFor(() => {
+      expect(mocks.createSession).toHaveBeenCalledWith({ permissionMode: 'default' })
+    })
+
+    try {
+      expect(useSessionRuntimeStore.getState().selections['draft-session']).toEqual({
+        providerId: 'deepseek-account',
+        modelId: 'deepseek-v4-pro[1m]',
+        effortLevel: 'high',
+      })
+    } finally {
+      useSettingsStore.setState(restoreSettings)
+    }
+  })
+
   it.each([true, false])('materializes raw provider models with 1M=%s before the first draft message', async (enabled) => {
     useProviderStore.setState({
       providers: [{
@@ -1611,7 +1646,7 @@ describe('EmptySession', () => {
 
     async function dictate() {
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Dictate' }))
+        fireEvent.click(screen.getByRole('button', { name: /^Dictate( \(.+\))?$/ }))
       })
       await act(async () => {
         fireEvent.click(await screen.findByRole('button', { name: 'Stop recording and transcribe' }))
@@ -1659,7 +1694,7 @@ describe('EmptySession', () => {
     it('starts the session with the dictated text when sent from the recording bar', async () => {
       render(<EmptySession />)
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Dictate' }))
+        fireEvent.click(screen.getByRole('button', { name: /^Dictate( \(.+\))?$/ }))
       })
       // The bar takes the toolbar's row: its controls, Run included, are hidden.
       expect(screen.getByTestId('voice-recording-bar')).toBeVisible()
@@ -1712,7 +1747,7 @@ describe('EmptySession', () => {
     it('releases the microphone when the page is left mid-recording', async () => {
       const { unmount } = render(<EmptySession />)
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Dictate' }))
+        fireEvent.click(screen.getByRole('button', { name: /^Dictate( \(.+\))?$/ }))
       })
       await screen.findByRole('button', { name: 'Stop recording and transcribe' })
 

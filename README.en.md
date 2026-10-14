@@ -21,6 +21,20 @@
 
 cc-haha is a **desktop Claude Code workspace** for macOS, Windows, and Linux: multi-session workspaces, global search, branch / Worktree launch, diff review, built-in browser preview, GUI permission approval, any model — Claude, ChatGPT, Grok, presets, or local endpoints — image generation, visual MCP & SubAgent managers, an Agent Teams workbench, dynamic Workflow orchestration, model trace, Computer Use, skill marketplace, colour themes, desktop pets, H5 remote access, IM integration, and scheduled tasks, all in one app. **On macOS, Computer Use can operate other apps without taking over your physical mouse or keyboard.**
 
+<p align="center"><b>Platinum Sponsor · Modelflare</b></p>
+
+<p align="center">
+  <a href="https://modelflare.dev/sign-up?utm_source=github&amp;utm_campaign=cchaha">
+    <img src="docs/images/sponsors/modelflare-banner-en.png" width="720" alt="Modelflare: Full strength, stable, nothing watered down. Global SOTA models at a lower cost.">
+  </a>
+</p>
+
+<p><sub>Thanks to <a href="https://modelflare.dev/sign-up?utm_source=github&amp;utm_campaign=cchaha">Modelflare</a> for sponsoring this project! Modelflare: Full strength, stable, nothing watered down. Global SOTA models at a lower cost. Operated by US-based Havenbyte LLC, Modelflare supports GPT, Claude, Gemini, Grok, and other leading models through common compatible protocols, plus 40+ image and video models.</sub></p>
+
+<p><sub><b>Cache compensation is a highlight:</b> selected OpenAI groups (price-first, stable, and premium) guarantee daily cache hit rates of 65%, 75%, or 85%, and if eligible requests fall short, Modelflare refunds the difference, visible on the usage dashboard after settlement.</sub></p>
+
+<p><sub><b>Special offers:</b> a single top-up of US$20 unlocks the GPT discount group at a 0.015x price multiplier, and a single top-up of US$50 unlocks the Claude discount group at a 0.03x multiplier. Register via <a href="https://modelflare.dev/sign-up?utm_source=github&amp;utm_campaign=cchaha">this exclusive link</a> to get started.</sub></p>
+
 <p align="center">
   <a href="#desktop-preview">Desktop Preview</a> · <a href="#install-the-desktop-app">Install</a> · <a href="#desktop-highlights">Highlights</a> · <a href="#more-documentation">More Docs</a> · <a href="#sponsorship--partnership">Sponsorship</a> · <a href="#user-group">User Group</a>
 </p>
@@ -62,16 +76,6 @@ This project is maintained in the author's spare time. Corporate or individual s
       </td>
       <td valign="middle">
         Thanks to <a href="https://aruhub.com/sign-up?aff=Z54g">AruHub</a> for sponsoring this project! AruHub focuses on providing developers with a stable, long-term primary API upstream service. Built for high-frequency AI coding workflows such as Codex and Claude Code, it offers official GPT API access through enterprise groups and stable Claude enterprise groups for sustained use, with support for leading models including GPT and Claude. Image 2 / 2.5 is available around the clock, starting at CNY 0.04 per image. Pay-as-you-go billing supports high-volume enterprise usage, invoicing, and refunds. Register through the <a href="https://aruhub.com/sign-up?aff=Z54g">exclusive link</a> to receive US$1 in credit usable across all models, with no model restrictions.
-      </td>
-    </tr>
-    <tr>
-      <td align="center" valign="middle">
-        <a href="https://www.apismart.ai">
-          <img src="docs/images/sponsors/apismart-logo.png" width="180" alt="ApiSmart">
-        </a>
-      </td>
-      <td valign="middle">
-        Thanks to <a href="https://www.apismart.ai">ApiSmart</a> for sponsoring this project. ApiSmart provides unified access to leading AI models through a single API. Use one API key to connect with LLM, image, and video models through an OpenAI-compatible interface. Easily switch between models, simplify billing, and improve reliability with intelligent routing and automatic failover.
       </td>
     </tr>
   </tbody>
@@ -199,6 +203,7 @@ Thanks to the following open-source projects and community practices for referen
 - [Electron](https://github.com/electron/electron): cross-platform desktop app capabilities and engineering practices.
 - [cc-switch](https://github.com/farion1231/cc-switch): reference for model provider configuration.
 - [LINUX DO](https://linux.do/): a new ideal developer community.
+- [AtomGit](https://atomgit.com/NanmiCoder/cc-haha): code hosting for this project in China.
 
 ---
 

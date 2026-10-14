@@ -175,6 +175,7 @@ vi.mock('../../i18n', () => ({
       'tabs.closeLeft': 'Close Left',
       'tabs.closeRight': 'Close Right',
       'tabs.closeAll': 'Close All',
+      'tabs.reopenClosed': 'Reopen Closed Tab',
       'tabs.closeConfirmTitle': 'Session Running',
       'tabs.closeConfirmMessage': 'Still running',
       'tabs.closeConfirmKeep': 'Keep Running',
@@ -666,6 +667,111 @@ describe('TabBar', () => {
       useWorkspaceStore.getState().openTarget(sessionId, { kind: 'file', path: 'a.ts' })
     })
 
+    expect(screen.queryByRole('button', { name: /activity/i })).not.toBeInTheDocument()
+  })
+
+  it('does not re-derive Activity when another session streams (#1480)', async () => {
+    // The strip derived Activity inside a store selector, and selectors run on
+    // every update of every session. Each token of a background run cost one
+    // pass over the on-screen session's whole transcript.
+    const actual = await vi.importActual<typeof import('../activity/sessionActivityModel')>('../activity/sessionActivityModel')
+    const derivedFor = vi.fn<(sessionId: string) => void>()
+    vi.doMock('../activity/sessionActivityModel', () => ({
+      ...actual,
+      buildMainSessionActivityModel: (input: Parameters<typeof actual.buildMainSessionActivityModel>[0]) => {
+        derivedFor(input.sessionId)
+        return actual.buildMainSessionActivityModel(input)
+      },
+      getMainSessionActivityModel: (input: Parameters<typeof actual.getMainSessionActivityModel>[0]) => {
+        derivedFor(input.sessionId)
+        return actual.getMainSessionActivityModel(input)
+      },
+    }))
+    try {
+      const { TabBar } = await import('./TabBar')
+      const { useTabStore } = await import('../../stores/tabStore')
+      const { useChatStore } = await import('../../stores/chatStore')
+      const onScreen = makeChatSession('idle')
+      onScreen.messages = [completedTodoWriteMessage()]
+      useTabStore.setState({
+        tabs: [
+          { sessionId: 'session-1', title: 'On screen', type: 'session', status: 'idle' },
+          { sessionId: 'session-2', title: 'Background', type: 'session', status: 'running' },
+        ],
+        activeTabId: 'session-1',
+      })
+      useChatStore.setState({
+        sessions: { 'session-1': onScreen, 'session-2': makeChatSession('streaming') },
+        disconnectSession: vi.fn(),
+      } as Partial<ReturnType<typeof useChatStore.getState>>)
+
+      await act(async () => {
+        render(<TabBar />)
+      })
+      expect(screen.getByRole('button', { name: /activity/i })).toBeInTheDocument()
+
+      derivedFor.mockClear()
+      for (const chunk of ['Adding', 'Adding vehicle', 'Adding vehicle 401']) {
+        act(() => {
+          useChatStore.setState((state) => ({
+            sessions: {
+              ...state.sessions,
+              'session-2': { ...state.sessions['session-2']!, streamingText: chunk },
+            },
+          }))
+        })
+      }
+      expect(derivedFor).not.toHaveBeenCalled()
+
+      // The on-screen session still drives it: clearing its history hides the button.
+      act(() => {
+        useChatStore.setState((state) => ({
+          sessions: { ...state.sessions, 'session-1': { ...state.sessions['session-1']!, messages: [] } },
+        }))
+      })
+      expect(derivedFor).toHaveBeenCalledWith('session-1')
+      expect(screen.queryByRole('button', { name: /activity/i })).not.toBeInTheDocument()
+    } finally {
+      vi.doUnmock('../activity/sessionActivityModel')
+    }
+  })
+
+  it('shows the activity button for a background task that starts after mount', async () => {
+    // The strip derives Activity from inputs it selects one by one, so each of
+    // them has to reach the derivation when it changes on its own.
+    const { TabBar } = await import('./TabBar')
+    const { useTabStore } = await import('../../stores/tabStore')
+    const { useChatStore } = await import('../../stores/chatStore')
+    useTabStore.setState({
+      tabs: [{ sessionId: 'session-1', title: 'Chat', type: 'session', status: 'idle' }],
+      activeTabId: 'session-1',
+    })
+    useChatStore.setState({
+      sessions: { 'session-1': makeChatSession('idle') },
+      disconnectSession: vi.fn(),
+    } as Partial<ReturnType<typeof useChatStore.getState>>)
+
+    await act(async () => {
+      render(<TabBar />)
+    })
+    expect(screen.queryByRole('button', { name: /activity/i })).not.toBeInTheDocument()
+
+    // Only the task record changes: the transcript array keeps its identity.
+    const withTasks = (tasks: BackgroundAgentTask[]) => {
+      useChatStore.setState((state) => ({
+        sessions: {
+          ...state.sessions,
+          'session-1': {
+            ...state.sessions['session-1']!,
+            backgroundAgentTasks: Object.fromEntries(tasks.map((task) => [task.taskId, task])),
+          },
+        },
+      }))
+    }
+    act(() => withTasks([makeBackgroundTask('bg-1', { taskType: 'local_agent' })]))
+    expect(screen.getByRole('button', { name: /activity/i })).toBeInTheDocument()
+
+    act(() => withTasks([]))
     expect(screen.queryByRole('button', { name: /activity/i })).not.toBeInTheDocument()
   })
 
@@ -3122,6 +3228,55 @@ describe('TabBar', () => {
       expect(useTabStore.getState().tabs.map((tab) => tab.sessionId)).toEqual(['tab-kept'])
       expect(useChatStore.getState().sessions['tab-kept']?.backgroundAgentTasks?.['kept-1']?.status).toBe('running')
     })
+  })
+
+  it('reopens a closed chat tab from the tab menu, and offers it only after one was closed', async () => {
+    const { TabBar } = await import('./TabBar')
+    const { useTabStore } = await import('../../stores/tabStore')
+    const { useChatStore } = await import('../../stores/chatStore')
+    const { useSessionStore } = await import('../../stores/sessionStore')
+    const connectToSession = vi.fn()
+    const disconnectSession = vi.fn()
+
+    useSessionStore.setState({
+      sessions: [
+        { id: 'tab-a', title: 'Session A', createdAt: '2026-10-01T00:00:00.000Z', modifiedAt: '2026-10-01T00:00:00.000Z', messageCount: 3, projectPath: '-repo', workDir: '/repo', workDirExists: true },
+      ],
+    } as never)
+    useTabStore.setState({
+      tabs: [
+        { sessionId: 'tab-a', title: 'Session A', type: 'session', status: 'idle' },
+        { sessionId: 'tab-b', title: 'Session B', type: 'session', status: 'idle' },
+      ],
+      activeTabId: 'tab-b',
+      closedSessionTabs: [],
+    })
+    useChatStore.setState({
+      sessions: { 'tab-a': makeChatSession('idle'), 'tab-b': makeChatSession('idle') },
+      connectToSession,
+      disconnectSession,
+    } as Partial<ReturnType<typeof useChatStore.getState>>)
+
+    await act(async () => {
+      render(<TabBar />)
+    })
+
+    fireEvent.contextMenu(screen.getByText('Session B'))
+    expect(screen.getByText('Reopen Closed Tab')).toBeDisabled()
+
+    fireEvent.click(screen.getByText('Close Others'))
+    expect(useTabStore.getState().tabs.map((tab) => tab.sessionId)).toEqual(['tab-b'])
+    expect(disconnectSession).toHaveBeenCalledWith('tab-a')
+
+    fireEvent.contextMenu(screen.getByText('Session B'))
+    await act(async () => {
+      fireEvent.click(screen.getByText('Reopen Closed Tab'))
+    })
+
+    expect(useTabStore.getState().tabs.map((tab) => tab.sessionId)).toEqual(['tab-b', 'tab-a'])
+    expect(useTabStore.getState().activeTabId).toBe('tab-a')
+    expect(connectToSession).toHaveBeenCalledWith('tab-a')
+    expect(screen.queryByText('Reopen Closed Tab')).not.toBeInTheDocument()
   })
 
   it('shows a running marker on tabs from tab status, live chat state, or background tasks', async () => {

@@ -663,7 +663,8 @@ describe('Settings > General tab', () => {
 
     fireEvent.click(screen.getByRole('radio', { name: /^Manual proxy/i }))
     const proxyInput = screen.getByLabelText('Proxy URL')
-    const saveButton = screen.getAllByRole('button', { name: 'Save' })[0]!
+    const networkSection = screen.getByRole('heading', { name: 'Network' }).closest('section')!
+    const saveButton = within(networkSection).getByRole('button', { name: 'Save' })
 
     expect(screen.getByText('Enter a proxy URL.')).toBeInTheDocument()
     expect(saveButton).toBeDisabled()
@@ -704,7 +705,8 @@ describe('Settings > General tab', () => {
     fireEvent.change(timeoutInput, { target: { value: String(seconds) } })
     fireEvent.blur(timeoutInput)
     expect(timeoutInput).toHaveValue(seconds)
-    const saveButton = screen.getAllByRole('button', { name: 'Save' })[0]!
+    const networkSection = screen.getByRole('heading', { name: 'Network' }).closest('section')!
+    const saveButton = within(networkSection).getByRole('button', { name: 'Save' })
     expect(saveButton).not.toBeDisabled()
 
     await act(async () => {
@@ -720,7 +722,8 @@ describe('Settings > General tab', () => {
 
     fireEvent.click(screen.getByText('General'))
     const timeoutInput = screen.getByLabelText('AI request timeout')
-    const saveButton = screen.getAllByRole('button', { name: 'Save' })[0]!
+    const networkSection = screen.getByRole('heading', { name: 'Network' }).closest('section')!
+    const saveButton = within(networkSection).getByRole('button', { name: 'Save' })
 
     fireEvent.change(timeoutInput, { target: { value: '2147484' } })
     expect(screen.getByText('Enter a whole number from 30 to 2147483 seconds.')).toBeInTheDocument()
@@ -1358,7 +1361,25 @@ describe('Settings > General tab', () => {
       await act(async () => { fireEvent.click(toggle) })
       expect(toggle).not.toBeChecked()
       expect(updateUser).toHaveBeenLastCalledWith({ agentTeamsEnabled: false })
-      await act(async () => { fireEvent.click(toggle) })
+      updateUser.mockClear()
+
+      // Turning it back on first explains the cost; nothing is saved until
+      // the user confirms, and cancelling leaves it off.
+      fireEvent.click(toggle)
+      const dialog = screen.getByRole('dialog')
+      expect(dialog).toHaveTextContent('Uses a lot of tokens')
+      expect(dialog).toHaveTextContent('Slower to finish')
+      expect(dialog).toHaveTextContent('Not suited to every task')
+      expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(toggle).not.toBeChecked()
+      expect(updateUser).not.toHaveBeenCalled()
+
+      fireEvent.click(toggle)
+      await act(async () => {
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Turn on anyway' }))
+      })
       expect(toggle).toBeChecked()
       expect(updateUser).toHaveBeenLastCalledWith({ agentTeamsEnabled: true })
     } finally {
@@ -2322,6 +2343,7 @@ describe('Settings > Providers tab', () => {
       'openai-official-provider',
       'claude-official-provider',
       'grok-official-provider',
+      'deepseek-account-provider',
     ])
   })
 
@@ -2337,6 +2359,7 @@ describe('Settings > Providers tab', () => {
       'claude-official-provider',
       'openai-official-provider',
       'grok-official-provider',
+      'deepseek-account-provider',
     ])
   })
 
@@ -2392,7 +2415,7 @@ describe('Settings > Providers tab', () => {
     fireEvent.click(addButton)
 
     const dialog = screen.getByRole('dialog')
-    expect(within(dialog).getByLabelText(/Name/i)).toHaveValue('Custom')
+    expect(within(dialog).getByLabelText(/Name/i)).toHaveValue('Custom API')
     expect(within(dialog).getByRole('textbox', { name: /Base URL/i })).toBeEnabled()
 
     const baseUrlInfo = within(dialog).getByRole('button', { name: 'Base URL help' })

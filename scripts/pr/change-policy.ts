@@ -20,6 +20,8 @@ export type ChangePolicyResult = {
   blockingReason: string | null
   blockingReasons: string[]
   cliCoreFiles: string[]
+  /** Why CLI core changes were allowed: the override label, or a PR authored by a CODEOWNER. */
+  cliCoreOverride: 'label' | 'codeowner-author' | null
   coveragePolicyFiles: string[]
   missingTestSignals: string[]
   checks: {
@@ -30,6 +32,7 @@ export type ChangePolicyResult = {
     providerContract: boolean
     chatContract: boolean
     agentFlow: boolean
+    agentE2e: boolean
     persistence: boolean
     policy: boolean
     docs: boolean
@@ -122,6 +125,22 @@ const chatContractPrefixes = [
  * session lifecycle, WebSocket framing, tool permission round-trips, reconnect
  * replay, and the mock runtime that stands in for a provider.
  */
+/**
+ * Harness of the agent loop lane (scripted mock LLM plus recorded-traffic replay).
+ * Product code reaches it through the broader
+ * `src/` rule in the selector: that lane runs the real CLI, so any runtime change
+ * can break the agent loop it proves.
+ */
+const agentE2eHarnessPaths = [
+  'scripts/quality-gate/mock-llm/',
+  'scripts/quality-gate/replay/',
+  'scripts/quality-gate/agent-flow/',
+  'scripts/quality-gate/sandbox.ts',
+  'preload.ts',
+  'package.json',
+  'bun.lock',
+]
+
 const agentFlowPrefixes = [
   'src/server/api/sessions',
   'src/server/services/conversationService',
@@ -319,6 +338,7 @@ export function evaluateChangePolicy(
   inputFiles: string[],
   inputLabels: string[] = [],
   inputDependentFiles: string[] = [],
+  owners: { author?: string; codeOwners?: string[] } = {},
 ): ChangePolicyResult {
   const files = [...new Set(inputFiles.map(normalizePath).filter(Boolean))].sort()
   const labels = [...new Set(inputLabels.map((label) => label.trim()).filter(Boolean))].sort()
@@ -337,7 +357,15 @@ export function evaluateChangePolicy(
 
   const cliCoreFiles = files.filter(isCliCorePath)
   const hasCliCoreChange = cliCoreFiles.length > 0
-  const hasCliCoreOverride = labels.includes(ALLOW_CLI_CORE_LABEL)
+  // The label asks a maintainer to approve a CLI core change. A CODEOWNER (read
+  // from the base branch, never from the PR) is that maintainer already.
+  const author = owners.author?.trim().toLowerCase()
+  const cliCoreOverride = labels.includes(ALLOW_CLI_CORE_LABEL)
+    ? 'label'
+    : author && (owners.codeOwners ?? []).includes(author)
+      ? 'codeowner-author'
+      : null
+  const hasCliCoreOverride = cliCoreOverride !== null
   const coveragePolicyFiles = files.filter((file) => coveragePolicyExactPaths.has(file))
   const hasCoveragePolicyOverride = labels.includes(ALLOW_COVERAGE_BASELINE_LABEL)
   const missingTests = missingTestSignals(files)
@@ -373,6 +401,10 @@ export function evaluateChangePolicy(
   const touchesProviderContract = selectionFiles.some((file) => startsWithAny(file, providerContractPrefixes))
   const touchesChatContract = selectionFiles.some((file) => startsWithAny(file, chatContractPrefixes))
   const touchesAgentFlow = selectionFiles.some((file) => startsWithAny(file, agentFlowPrefixes))
+  const touchesAgentE2e = selectionFiles.some((file) => (
+    (file.startsWith('src/') && isExecutableSourcePath(file) && !isAgentInstructionPath(file)) ||
+    startsWithAny(file, agentE2eHarnessPaths)
+  ))
   const touchesPersistence = selectionFiles.some((file) => startsWithAny(file, persistencePrefixes))
   const touchesPolicy = files.some((file) => (
     startsWithAny(file, policyPrefixes) ||
@@ -411,6 +443,7 @@ export function evaluateChangePolicy(
     blockingReason: blockingReasons[0] ?? null,
     blockingReasons,
     cliCoreFiles,
+    cliCoreOverride: hasCliCoreChange ? cliCoreOverride : null,
     coveragePolicyFiles,
     missingTestSignals: missingTests,
     checks: {
@@ -421,12 +454,26 @@ export function evaluateChangePolicy(
       providerContract: touchesProviderContract,
       chatContract: touchesChatContract,
       agentFlow: touchesAgentFlow,
+      agentE2e: touchesAgentE2e,
       persistence: touchesPersistence,
       policy: touchesPolicy,
       docs: touchesDocs,
       coverage: touchesCoverage,
     },
   }
+}
+
+/** Individual `@login` owners in a CODEOWNERS file, lowercased. Team handles and emails never match an author. */
+export function codeOwnerLogins(codeowners: string) {
+  const logins = new Set<string>()
+  for (const line of codeowners.split(/\r?\n/)) {
+    const content = line.replace(/#.*$/, '').trim()
+    if (!content) continue
+    for (const token of content.split(/\s+/).slice(1)) {
+      if (/^@[A-Za-z0-9-]+$/.test(token)) logins.add(token.slice(1).toLowerCase())
+    }
+  }
+  return [...logins].sort()
 }
 
 function parseArgs(argv: string[]) {
@@ -466,8 +513,12 @@ function formatSummary(result: ChangePolicyResult) {
     'PR change policy',
     `  Areas: ${result.areas.length ? result.areas.join(', ') : 'none'}`,
     `  Labels: ${result.labels.length ? result.labels.join(', ') : 'none'}`,
-    `  Checks: desktop=${result.checks.desktop}, server=${result.checks.server}, adapters=${result.checks.adapters}, desktopNative=${result.checks.desktopNative}, providerContract=${result.checks.providerContract}, chatContract=${result.checks.chatContract}, agentFlow=${result.checks.agentFlow}, persistence=${result.checks.persistence}, policy=${result.checks.policy}, docs=${result.checks.docs}, coverage=${result.checks.coverage}`,
+    `  Checks: desktop=${result.checks.desktop}, server=${result.checks.server}, adapters=${result.checks.adapters}, desktopNative=${result.checks.desktopNative}, providerContract=${result.checks.providerContract}, chatContract=${result.checks.chatContract}, agentFlow=${result.checks.agentFlow}, agentE2e=${result.checks.agentE2e}, persistence=${result.checks.persistence}, policy=${result.checks.policy}, docs=${result.checks.docs}, coverage=${result.checks.coverage}`,
   ]
+
+  if (result.cliCoreOverride) {
+    lines.push(`  CLI core override: ${result.cliCoreOverride}`)
+  }
 
   if (result.cliCoreFiles.length > 0) {
     lines.push('  CLI core files:')
@@ -511,6 +562,7 @@ function writeGithubOutputs(result: ChangePolicyResult) {
     area_labels: result.areaLabels.join(','),
     blocked: String(result.blocked),
     blocking_reasons: result.blockingReasons.join(' | '),
+    cli_core_override: result.cliCoreOverride ?? '',
     desktop_checks: String(result.checks.desktop),
     server_checks: String(result.checks.server),
     adapter_checks: String(result.checks.adapters),
@@ -518,6 +570,7 @@ function writeGithubOutputs(result: ChangePolicyResult) {
     provider_contract_checks: String(result.checks.providerContract),
     chat_contract_checks: String(result.checks.chatContract),
     agent_flow_checks: String(result.checks.agentFlow),
+    agent_e2e_checks: String(result.checks.agentE2e),
     persistence_checks: String(result.checks.persistence),
     policy_checks: String(result.checks.policy),
     docs_checks: String(result.checks.docs),
@@ -537,9 +590,11 @@ if (import.meta.main) {
   const filesPath = args.get('--files')
   const labelsPath = args.get('--labels-file')
   const labelsArg = args.get('--labels')
+  const authorPath = args.get('--author-file')
+  const codeOwnersPath = args.get('--codeowners-file')
 
   if (!filesPath) {
-    console.error('Usage: bun run scripts/pr/change-policy.ts --files <changed-files.txt> [--labels-file <labels.txt>]')
+    console.error('Usage: bun run scripts/pr/change-policy.ts --files <changed-files.txt> [--labels-file <labels.txt>] [--author-file <author.txt> --codeowners-file <base CODEOWNERS>]')
     process.exit(2)
   }
 
@@ -555,7 +610,10 @@ if (import.meta.main) {
     console.warn(`[change-policy] dependency graph unavailable (${resolution.reason}); selecting every surface check.`)
   }
 
-  const result = evaluateChangePolicy(files, labels, resolution.dependents)
+  // Both files are optional: a push, or a local run, has no PR author.
+  const author = authorPath && existsSync(authorPath) ? readFileSync(authorPath, 'utf8').trim() : undefined
+  const codeOwners = codeOwnersPath && existsSync(codeOwnersPath) ? codeOwnerLogins(readFileSync(codeOwnersPath, 'utf8')) : []
+  const result = evaluateChangePolicy(files, labels, resolution.dependents, { author, codeOwners })
   console.log(formatSummary(result))
   console.log(`  Dependent files: ${resolution.dependents.length}${resolution.degraded ? ' (degraded fallback)' : ''}`)
   writeGithubOutputs(result)

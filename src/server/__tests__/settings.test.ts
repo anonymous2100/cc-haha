@@ -502,7 +502,58 @@ describe('Settings API', () => {
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body).toEqual({ agentTeamsEnabled: true })
+    expect(body).toEqual({ agentTeamsEnabled: true, autoUpdateEnabled: true, maxConcurrentSubagents: null })
+  })
+
+  it('读取旧设置为不限，并通过 API 保存数量和恢复不限', async () => {
+    const settingsPath = path.join(tmpDir, 'settings.json')
+    const legacy = { env: { KEEP_ME: 'unchanged' }, futureSetting: { keep: true } }
+    const original = JSON.stringify(legacy)
+    await fs.writeFile(settingsPath, original)
+    const initial = makeRequest('GET', '/api/settings/user')
+    const response = await handleSettingsApi(initial.req, initial.url, initial.segments)
+    expect(await response.json()).toMatchObject({ maxConcurrentSubagents: null, ...legacy })
+    expect(await fs.readFile(settingsPath, 'utf-8')).toBe(original)
+
+    for (const limit of [4, 1, null]) {
+      const put = makeRequest('PUT', '/api/settings/user', { maxConcurrentSubagents: limit })
+      expect((await handleSettingsApi(put.req, put.url, put.segments)).status).toBe(200)
+      const get = makeRequest('GET', '/api/settings/user')
+      const saved = await handleSettingsApi(get.req, get.url, get.segments)
+      expect(await saved.json()).toMatchObject({ maxConcurrentSubagents: limit, ...legacy })
+      expect(JSON.parse(await fs.readFile(settingsPath, 'utf-8'))).toEqual({ ...legacy, maxConcurrentSubagents: limit })
+    }
+  })
+
+  it.each([0, -1, 1.5, '3', false, {}, Number.MAX_SAFE_INTEGER + 1])('API 拒绝非法并发上限 %j 且不改写设置', async value => {
+    const put = makeRequest('PUT', '/api/settings/user', { maxConcurrentSubagents: value })
+    expect((await handleSettingsApi(put.req, put.url, put.segments)).status).toBe(400)
+    expect(await new SettingsService().getUserSettings()).toEqual({})
+  })
+
+  it('persists automatic updates through the user settings API and preserves unrelated fields', async () => {
+    const settingsPath = path.join(tmpDir, 'settings.json')
+    const original = JSON.stringify({ futureSetting: { keep: true } })
+    await fs.writeFile(settingsPath, original)
+    const initial = makeRequest('GET', '/api/settings/user')
+    const oldSettings = await handleSettingsApi(initial.req, initial.url, initial.segments)
+    expect(await oldSettings.json()).toMatchObject({ autoUpdateEnabled: true, futureSetting: { keep: true } })
+    expect(await fs.readFile(settingsPath, 'utf-8')).toBe(original)
+
+    for (const enabled of [false, true]) {
+      const put = makeRequest('PUT', '/api/settings/user', { autoUpdateEnabled: enabled })
+      expect((await handleSettingsApi(put.req, put.url, put.segments)).status).toBe(200)
+      const get = makeRequest('GET', '/api/settings/user')
+      const response = await handleSettingsApi(get.req, get.url, get.segments)
+      expect(await response.json()).toMatchObject({ autoUpdateEnabled: enabled, futureSetting: { keep: true } })
+      expect(JSON.parse(await fs.readFile(settingsPath, 'utf-8'))).toEqual({ futureSetting: { keep: true }, autoUpdateEnabled: enabled })
+    }
+  })
+
+  it.each(['false', null, 1])('rejects invalid automatic update preference %j without changing settings', async value => {
+    const put = makeRequest('PUT', '/api/settings/user', { autoUpdateEnabled: value })
+    expect((await handleSettingsApi(put.req, put.url, put.segments)).status).toBe(400)
+    expect(await new SettingsService().getUserSettings()).toEqual({})
   })
 
   it('persists the General team preference across reads and overrides legacy env', async () => {
@@ -1540,6 +1591,33 @@ describe('Models API', () => {
     const get = makeRequest('GET', '/api/models/current')
     const body = await (await handleModelsApi(get.req, get.url, get.segments)).json()
     expect(body.model).toMatchObject({ id: 'grok-4.5', name: 'Grok 4.5' })
+  })
+
+  it('GET /api/models lists the DeepSeek preset models when DeepSeek Account is active', async () => {
+    const providerSvc = new ProviderService()
+    await providerSvc.activateProvider('deepseek-account')
+
+    const { req, url, segments } = makeRequest('GET', '/api/models')
+    const res = await handleModelsApi(req, url, segments)
+    const body = await res.json() as {
+      models: Array<{ id: string }>
+      provider: { id: string; name: string }
+    }
+    expect(body.provider).toEqual({ id: 'deepseek-account', name: 'DeepSeek Account' })
+    expect(body.models.map((model) => model.id)).toEqual(
+      expect.arrayContaining(['deepseek-v4-pro[1m]', 'deepseek-v4-flash']),
+    )
+  })
+
+  it('persists and reads a DeepSeek Account model from managed settings', async () => {
+    const providerSvc = new ProviderService()
+    await providerSvc.activateProvider('deepseek-account')
+    const put = makeRequest('PUT', '/api/models/current', { modelId: 'deepseek-v4-flash' })
+    expect((await handleModelsApi(put.req, put.url, put.segments)).status).toBe(200)
+
+    const get = makeRequest('GET', '/api/models/current')
+    const body = await (await handleModelsApi(get.req, get.url, get.segments)).json()
+    expect(body.model).toMatchObject({ id: 'deepseek-v4-flash' })
   })
 
   it('GET /api/effort should return default effort level', async () => {

@@ -16,6 +16,16 @@ function completion() {
   return events.map(event => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join('')
 }
 
+// Feed stdin through a pipe, the way the server drives the CLI. On Linux a Blob
+// stdin does not survive bin/claude-haha re-spawning the CLI with inherited stdin:
+// the CLI reads nothing and exits 0 with empty output.
+function spawnWithInput(command: string[], env: Record<string, string>, input: string) {
+  const child = Bun.spawn(command, { env, stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' })
+  child.stdin.write(input)
+  child.stdin.end()
+  return child
+}
+
 test('headless session inbox acknowledges queued then consumed and deduplicates control deliveries', async () => {
   const home = await mkdtemp(join(tmpdir(), 'session-message-print-'))
   let requests = 0

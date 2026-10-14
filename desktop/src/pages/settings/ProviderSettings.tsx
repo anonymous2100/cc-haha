@@ -54,6 +54,7 @@ import { normalizeProviderBaseUrl, presetMatchesBaseUrl, selectableProviderPrese
 import { ClaudeOfficialLogin } from '../../components/settings/ClaudeOfficialLogin'
 import { ChatGPTOfficialLogin } from '../../components/settings/ChatGPTOfficialLogin'
 import { GrokOfficialLogin } from '../../components/settings/GrokOfficialLogin'
+import { DeepSeekAccountLogin } from '../../components/settings/DeepSeekAccountLogin'
 import { OfficialProviderModelSettings } from '../../components/settings/OfficialProviderModelSettings'
 import { CcSwitchImportModal } from '../../components/settings/CcSwitchImportModal'
 import { ModelIdCombobox } from '../../components/settings/ModelIdCombobox'
@@ -62,6 +63,7 @@ import { compatibilityForm, invalidCompatibilityNumber, parseCompatibilityForm, 
 import { ProviderImageGenerationFields, type ImageGenerationFormValue } from '../../components/settings/ProviderImageGenerationFields'
 import { BUILT_IN_PROVIDER_IDS, CLAUDE_OFFICIAL_PROVIDER_ID, OPENAI_OFFICIAL_PROVIDER_ID } from '../../constants/openaiOfficialProvider'
 import { GROK_OFFICIAL_PROVIDER_ID } from '../../constants/grokOfficialProvider'
+import { DEEPSEEK_ACCOUNT_PROVIDER_ID } from '../../constants/deepseekAccountProvider'
 import { ApiError, getBaseUrl } from '../../api/client'
 import { getDesktopHost } from '../../lib/desktopHost'
 import { API_KEY_JSON_PLACEHOLDER, maskSettingsJsonSecrets, restoreSettingsJsonSecrets, stripProviderSettingsJsonEnv } from '../../lib/providerSettingsJson'
@@ -92,6 +94,7 @@ type ProviderListItem =
   | { id: typeof CLAUDE_OFFICIAL_PROVIDER_ID; kind: 'claude-official' }
   | { id: typeof OPENAI_OFFICIAL_PROVIDER_ID; kind: 'openai-official' }
   | { id: typeof GROK_OFFICIAL_PROVIDER_ID; kind: 'grok-official' }
+  | { id: typeof DEEPSEEK_ACCOUNT_PROVIDER_ID; kind: 'deepseek-account' }
   | { id: string; kind: 'saved'; provider: SavedProvider }
 
 /** Row labels for the model-mapping form, in `MODEL_SLOTS` order. */
@@ -148,6 +151,7 @@ function buildProviderListItems(
     [CLAUDE_OFFICIAL_PROVIDER_ID, { id: CLAUDE_OFFICIAL_PROVIDER_ID, kind: 'claude-official' }],
     [OPENAI_OFFICIAL_PROVIDER_ID, { id: OPENAI_OFFICIAL_PROVIDER_ID, kind: 'openai-official' }],
     [GROK_OFFICIAL_PROVIDER_ID, { id: GROK_OFFICIAL_PROVIDER_ID, kind: 'grok-official' }],
+    [DEEPSEEK_ACCOUNT_PROVIDER_ID, { id: DEEPSEEK_ACCOUNT_PROVIDER_ID, kind: 'deepseek-account' }],
     ...savedItems,
   ])
 
@@ -164,6 +168,8 @@ function providerItemTestId(item: ProviderListItem): string {
       return 'openai-official-provider'
     case 'grok-official':
       return 'grok-official-provider'
+    case 'deepseek-account':
+      return 'deepseek-account-provider'
     case 'saved':
       return `provider-${item.provider.id}`
   }
@@ -273,6 +279,7 @@ export function ProviderSettings({ browserMode = false }: { browserMode?: boolea
   const isClaudeOfficialActive = hasLoadedProviders && activeId === null
   const isOpenAIOfficialActive = hasLoadedProviders && activeId === OPENAI_OFFICIAL_PROVIDER_ID
   const isGrokOfficialActive = hasLoadedProviders && activeId === GROK_OFFICIAL_PROVIDER_ID
+  const isDeepSeekAccountActive = hasLoadedProviders && activeId === DEEPSEEK_ACCOUNT_PROVIDER_ID
 
   return (
     <div className="min-w-0">
@@ -378,6 +385,30 @@ export function ProviderSettings({ browserMode = false }: { browserMode?: boolea
                       <div className="flex flex-col">
                         <GrokOfficialLogin />
                         <OfficialProviderModelSettings providerId={GROK_OFFICIAL_PROVIDER_ID} />
+                      </div>
+                    ) : null}
+                  />
+                )
+              }
+
+              if (item.kind === 'deepseek-account') {
+                return (
+                  <SortableProviderCard
+                    browserMode={browserMode}
+                    key={item.id}
+                    item={item}
+                    isActive={isDeepSeekAccountActive}
+                    dragLabel={t('settings.providers.dragToReorder')}
+                    onActivate={!isDeepSeekAccountActive ? () => handleActivate(DEEPSEEK_ACCOUNT_PROVIDER_ID) : undefined}
+                    title={t('settings.providers.deepseekAccountName')}
+                    subtitle={t('settings.providers.deepseekAccountDesc')}
+                    badges={isDeepSeekAccountActive ? (
+                      <Badge tone="brand">{t('settings.providers.default')}</Badge>
+                    ) : null}
+                    details={!browserMode && isDeepSeekAccountActive ? (
+                      <div className="flex flex-col">
+                        <DeepSeekAccountLogin />
+                        <OfficialProviderModelSettings providerId={DEEPSEEK_ACCOUNT_PROVIDER_ID} />
                       </div>
                     ) : null}
                   />
@@ -1173,6 +1204,10 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, browserMode
   const initialPreset = provider
     ? availablePresets.find((p) => p.id === provider.presetId) ?? fallbackPreset
     : selectablePresets[0] ?? fallbackPreset
+  // The custom preset's catalog name is a bare English "Custom"; show a localized
+  // label that says what it is for.
+  const presetLabel = (preset: ProviderPreset) =>
+    preset.id === 'custom' ? t('settings.providers.customPreset') : preset.name
   const initialModels = stripModel1mMarkers(provider?.models ?? initialPreset.defaultModels)
   const initialImageGeneration = provider
     ? provider.imageGeneration
@@ -1187,7 +1222,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, browserMode
   )
 
   const [selectedPreset, setSelectedPreset] = useState<ProviderPreset>(initialPreset)
-  const [name, setName] = useState(provider?.name ?? initialPreset.name)
+  const [name, setName] = useState(provider?.name ?? presetLabel(initialPreset))
   const [baseUrl, setBaseUrl] = useState(provider?.baseUrl ?? initialPreset.baseUrl)
   // A preset that decides the protocol per model owns this field: the picked value
   // is only the fallback for models no rule matches, so a record carrying a stale
@@ -1218,6 +1253,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, browserMode
   const [imageGeneration, setImageGeneration] = useState<ImageGenerationFormValue>({
     enabled: Boolean(initialImageGeneration),
     model: initialImageGeneration?.model ?? '',
+    protocol: initialImageGeneration?.protocol ?? 'openai_images',
     baseUrl: provider?.imageGeneration?.baseUrl ?? '',
     apiKey: provider?.imageGeneration?.apiKey ?? '',
   })
@@ -1349,11 +1385,12 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, browserMode
     settingsJsonUserEditedRef.current = false
     setSelectedPreset(preset)
     setCompatibility(compatibilityForm())
-    setName(preset.name)
+    setName(presetLabel(preset))
     setBaseUrl(preset.baseUrl)
     setImageGeneration({
       enabled: Boolean(preset.defaultImageGeneration),
       model: preset.defaultImageGeneration?.model ?? '',
+      protocol: preset.defaultImageGeneration?.protocol ?? 'openai_images',
       baseUrl: '',
       apiKey: '',
     })
@@ -1687,15 +1724,15 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, browserMode
   const renderPresetButton = (preset: ProviderPreset) => (
     <SettingsPill
       key={preset.id}
-      aria-label={preset.name}
+      aria-label={presetLabel(preset)}
       className="relative"
       tone="terracotta"
       selected={selectedPreset.id === preset.id}
       onClick={() => handlePresetChange(preset)}
     >
       {preset.id === 'aruhub' && <img src={aruhubLogo} alt="" className="size-4 rounded-[var(--radius-sm)] object-contain" />}
-      {preset.name}
-      {preset.id === 'aruhub' && <Star size={12} className="fill-[var(--color-warning)] text-[var(--color-warning)]" aria-label={t('settings.providers.sponsor')} />}
+      {presetLabel(preset)}
+      {(preset.id === 'aruhub' || preset.id === 'modelflare') && <Star size={12} className="fill-[var(--color-warning)] text-[var(--color-warning)]" aria-label={t('settings.providers.sponsor')} />}
       {preset.isNew && (
         <Badge tone="warning" size="xs" className="absolute -right-1 -top-2">
           {t('settings.providers.new')}
@@ -1716,6 +1753,7 @@ function ProviderFormModal({ open, onClose, mode, provider, presets, browserMode
     const storedImageGeneration = imageGeneration.enabled
       ? {
           model: imageGeneration.model.trim(),
+          protocol: imageGeneration.protocol,
           ...(imageGeneration.baseUrl.trim() ? { baseUrl: imageGeneration.baseUrl.trim() } : {}),
           ...(imageGeneration.apiKey.trim() ? { apiKey: imageGeneration.apiKey.trim() } : {}),
         }

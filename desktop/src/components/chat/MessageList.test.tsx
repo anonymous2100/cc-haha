@@ -2219,6 +2219,70 @@ describe('MessageList nested tool calls', () => {
     const divider = screen.getByTestId('compact-status-divider')
     expect(within(divider).getByText('Compacting context')).toBeTruthy()
     expect(screen.queryByText('Compacting context...')).toBeNull()
+    // No divider message yet means no known start time, so no fake 0:00 timer.
+    expect(within(divider).queryByTestId('compact-progress')).toBeNull()
+  })
+
+  it('ticks compaction elapsed time and shows the generated summary size', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-10T08:00:00Z'))
+    const startedAt = Date.now() - 65_000
+    const compactingDivider = (outputChars?: number): UIMessage => ({
+      id: 'compacting-1',
+      type: 'compact_summary',
+      title: 'Context compacted',
+      phase: 'compacting',
+      ...(outputChars !== undefined ? { outputChars } : {}),
+      timestamp: startedAt,
+    })
+    useChatStore.setState({
+      sessions: {
+        [ACTIVE_TAB]: makeSessionState({
+          chatState: 'compacting',
+          statusVerb: 'Compacting conversation',
+          messages: [compactingDivider()],
+        }),
+      },
+    })
+
+    render(<MessageList />)
+
+    const progress = () => within(screen.getByTestId('compact-status-divider')).getByTestId('compact-progress')
+    expect(screen.getAllByTestId('compact-status-divider')).toHaveLength(1)
+    expect(within(screen.getByTestId('compact-status-divider')).getByText('Compacting context')).toBeTruthy()
+    expect(progress().textContent).toBe(' · 1:05')
+
+    act(() => { vi.advanceTimersByTime(2_000) })
+    expect(progress().textContent).toBe(' · 1:07')
+
+    act(() => {
+      useChatStore.setState({
+        sessions: {
+          [ACTIVE_TAB]: makeSessionState({
+            chatState: 'compacting',
+            statusVerb: 'Compacting conversation',
+            messages: [compactingDivider(3_240)],
+          }),
+        },
+      })
+    })
+    expect(progress().textContent).toBe(' · 1:07 · 3.2k chars generated')
+
+    act(() => { vi.advanceTimersByTime(60_000) })
+    expect(progress().textContent).toBe(' · 2:07 · 3.2k chars generated')
+
+    act(() => {
+      useChatStore.setState({
+        sessions: {
+          [ACTIVE_TAB]: makeSessionState({
+            chatState: 'thinking',
+            messages: [{ ...compactingDivider(3_240), phase: 'complete' } as UIMessage],
+          }),
+        },
+      })
+    })
+    expect(within(screen.getByTestId('compact-status-divider')).queryByTestId('compact-progress')).toBeNull()
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   it('shows API retry metadata in the active turn indicator', () => {
@@ -8319,6 +8383,34 @@ describe('MessageList nested tool calls', () => {
     // The evidence is what tells a mid-block cut from a dropped message_stop
     // when users send a screenshot; the translation alone would hide it.
     expect(screen.getByText(raw)).toBeTruthy()
+  })
+
+  it('explains why auto-compact stopped instead of showing the English CLI text (#1544)', () => {
+    useSettingsStore.setState({ locale: 'zh' })
+    const raw =
+      'Auto-compact is thrashing: the context refilled to the limit within 3 turns of the previous compaction, 3 times in a row.'
+    useChatStore.setState({
+      sessions: {
+        [ACTIVE_TAB]: makeSessionState({
+          messages: [
+            {
+              id: 'error-1',
+              type: 'error',
+              code: 'unknown',
+              businessErrorCode: 'autocompact_thrashing',
+              message: raw,
+              timestamp: 1,
+            },
+          ],
+        }),
+      },
+    })
+
+    render(<MessageList />)
+
+    expect(screen.getByText(/自动压缩已停止/)).toBeTruthy()
+    expect(screen.getByText(/精简 CLAUDE.md/)).toBeTruthy()
+    expect(screen.queryByText(raw)).toBeNull()
   })
 
   it.each([

@@ -11,6 +11,7 @@ import {
   __resolveRuntimeRestartWorkDirForTests,
   closeSessionConnection,
   getActiveSessionIds,
+  getSessionTurnState,
   getRuntimeSettings,
   handleWebSocket,
   stopSessionTurn,
@@ -438,7 +439,9 @@ describe('WebSocket handler session isolation', () => {
       task_type: 'local_agent',
     }))
 
-    expect(oldSocket.close).toHaveBeenCalledWith(1008, 'Stale SDK token')
+    // 4003 is in the CLI transport's PERMANENT_CLOSE_CODES: the superseded
+    // runtime shuts down instead of reconnecting with its stale token.
+    expect(oldSocket.close).toHaveBeenCalledWith(4003, 'Stale SDK token')
     expect(handleSdkPayload).not.toHaveBeenCalled()
 
     handleWebSocket.open(newSocket)
@@ -449,6 +452,19 @@ describe('WebSocket handler session isolation', () => {
     expect(handleSdkPayload).toHaveBeenCalledTimes(1)
     expect(handleSdkPayload.mock.calls[0]?.[0]).toBe(sessionId)
     expect(handleSdkPayload.mock.calls[0]?.[1]).toBe(currentPayload)
+  })
+
+  it('rejects an SDK socket for a runtime the server does not own with a permanent close code', () => {
+    const sessionId = `sdk-unknown-runtime-${crypto.randomUUID()}`
+    const socket = makeSdkSocket(sessionId, 'token-from-a-forgotten-runtime')
+    const attach = spyOn(conversationService, 'attachSdkConnection')
+
+    handleWebSocket.open(socket)
+
+    // With 1008 the CLI retried, and every accepted upgrade reset its give-up
+    // budget, so a CLI the server had lost track of reconnected forever.
+    expect(socket.close).toHaveBeenCalledWith(4003, 'Invalid SDK token')
+    expect(attach).not.toHaveBeenCalled()
   })
 
   it('closes and removes an active client socket when a session is deleted', () => {
@@ -3646,6 +3662,84 @@ describe('WebSocket handler session isolation', () => {
     })
   })
 
+  it.each(['success', 'failure'])('settles /compact after stopping a pending question (%s)', async (outcome) => {
+    const sessionId = `stop-question-compact-${crypto.randomUUID()}`
+    const ws = makeClientSocket(sessionId)
+    const outputCallbacks = new Set<(cliMsg: any) => void>()
+    const sentUuids: string[] = []
+    spyOn(conversationService, 'hasSession').mockReturnValue(true)
+    spyOn(conversationService, 'getPendingPermissionRequests').mockReturnValue([])
+    spyOn(conversationService, 'onOutput').mockImplementation((_sid, callback) => {
+      outputCallbacks.add(callback)
+    })
+    spyOn(conversationService, 'removeOutputCallback').mockImplementation((_sid, callback) => {
+      outputCallbacks.delete(callback)
+    })
+    spyOn(conversationService, 'sendInterrupt').mockReturnValue(true)
+    spyOn(sessionService, 'getCustomTitle').mockResolvedValue('Existing title')
+    spyOn(conversationService, 'sendMessage').mockImplementation(
+      async (_sid, _content, _attachments, options) => {
+        sentUuids.push(options?.messageUuid ?? '')
+        options?.onCommitted?.()
+        return true
+      },
+    )
+    const emit = (event: any) => {
+      for (const callback of [...outputCallbacks]) callback(event)
+    }
+    handleWebSocket.open(ws)
+    handleWebSocket.message(ws, JSON.stringify({ type: 'user_message', content: 'Ask me A or B' }))
+    await flushMicrotasks(30)
+    emit({ type: 'control_request', request_id: 'question', request: {
+      subtype: 'can_use_tool', tool_name: 'AskUserQuestion', tool_use_id: 'question-tool',
+      input: { questions: [{ question: 'A or B?', header: 'Choice', options: [
+        { label: 'A', description: 'A' }, { label: 'B', description: 'B' },
+      ], multiSelect: false }] },
+    } })
+    handleWebSocket.message(ws, JSON.stringify({ type: 'stop_generation' }))
+    emit({ type: 'control_cancel_request', request_id: 'question' })
+    emit({ type: 'result', subtype: 'error', is_error: true, result: 'Interrupted' })
+    handleWebSocket.message(ws, JSON.stringify({ type: 'user_message', content: '/compact' }))
+    await flushMicrotasks(30)
+    ws.sent.length = 0
+    // A bare compacting status is not an acknowledgement of the new turn.
+    emit({ type: 'system', subtype: 'status', status: 'compacting' })
+    expect(ws.sent).toHaveLength(0)
+    emit({ type: 'system', subtype: 'local_command', uuid: sentUuids[1],
+      content: '<command-name>/compact</command-name>' })
+    emit({ type: 'system', subtype: 'status', status: 'compacting' })
+    if (outcome === 'success') {
+      emit({ type: 'system', subtype: 'compact_boundary', compact_metadata: { trigger: 'manual', pre_tokens: 1234 } })
+      emit({ type: 'user', message: { role: 'user', content: 'This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.\nSummary: canceled question' } })
+    } else {
+      emit({ type: 'system', subtype: 'local_command_output', content: '<local-command-stderr>Compaction failed</local-command-stderr>' })
+    }
+    const result = { type: 'result', subtype: 'success', is_error: false, usage: { input_tokens: 1, output_tokens: 1 } }
+    emit(result)
+    await flushMicrotasks()
+    expect(getSessionTurnState(sessionId)).toBe('idle')
+    expect(ws.sent.map(payload => JSON.parse(payload))).toContainEqual({
+      type: 'message_complete', usage: { input_tokens: 1, output_tokens: 1 },
+    })
+    if (outcome === 'success') {
+      expect(ws.sent.map(payload => JSON.parse(payload))).toContainEqual(expect.objectContaining({
+        type: 'system_notification', subtype: 'compact_boundary',
+      }))
+    } else {
+      expect(ws.sent.map(payload => JSON.parse(payload))).toContainEqual({ type: 'content_delta', text: 'Compaction failed' })
+    }
+    // A duplicate completion cannot leave admission busy; the next ordinary
+    // message uses its own UUID replay and completes normally.
+    emit(result)
+    handleWebSocket.message(ws, JSON.stringify({ type: 'user_message', content: 'Continue after compact' }))
+    await flushMicrotasks(30)
+    expect(getSessionTurnState(sessionId)).toBe('running')
+    emit({ type: 'user', isReplay: true, uuid: sentUuids[2], message: { role: 'user', content: 'Continue after compact' } })
+    emit({ ...result })
+    await flushMicrotasks()
+    expect(getSessionTurnState(sessionId)).toBe('idle')
+  })
+
   it('completes a local slash replacement after Agent control failure kills the runtime', async () => {
     const sessionId = `stop-replacement-local-command-agent-failure-${crypto.randomUUID()}`
     const ws = makeClientSocket(sessionId)
@@ -3927,6 +4021,7 @@ describe('WebSocket handler session isolation', () => {
     const sessionId = `stop-background-${crypto.randomUUID()}`
     const ws = makeClientSocket(sessionId)
     const requestControl = spyOn(conversationService, 'requestControl').mockResolvedValue({})
+    spyOn(conversationService, 'hasSession').mockReturnValue(true)
     handleWebSocket.open(ws)
 
     handleWebSocket.message(ws, JSON.stringify({
@@ -3945,6 +4040,7 @@ describe('WebSocket handler session isolation', () => {
     const sessionId = `stop-background-failed-${crypto.randomUUID()}`
     const ws = makeClientSocket(sessionId)
     spyOn(conversationService, 'requestControl').mockRejectedValue(new Error('Task is not running'))
+    spyOn(conversationService, 'hasSession').mockReturnValue(true)
     handleWebSocket.open(ws)
 
     handleWebSocket.message(ws, JSON.stringify({
@@ -3969,6 +4065,7 @@ describe('WebSocket handler session isolation', () => {
     const ws = makeClientSocket(sessionId)
     spyOn(conversationService, 'requestControl')
       .mockRejectedValue(new Error('No task found with ID: bash-task-1'))
+    spyOn(conversationService, 'hasSession').mockReturnValue(true)
     handleWebSocket.open(ws)
 
     handleWebSocket.message(ws, JSON.stringify({
@@ -4030,6 +4127,39 @@ describe('WebSocket handler session isolation', () => {
     // The task is untracked server-side, so reconnect snapshots no longer
     // list it as active and the terminal state survives a refresh.
     expect(activeBackgroundTaskIds.get(sessionId)?.has('bash-evicted-1') ?? false).toBe(false)
+  })
+
+  it('converges a history-only running task to stopped when no CLI process exists', async () => {
+    // A session run by an exited (or external) CLI has no process to ask, so a
+    // task its history still shows as running is stopped locally, not reported
+    // as "CLI session is not running".
+    const sessionId = `stop-background-no-cli-${crypto.randomUUID()}`
+    const ws = makeClientSocket(sessionId)
+    spyOn(conversationService, 'hasSession').mockReturnValue(false)
+    const requestControl = spyOn(conversationService, 'requestControl')
+      .mockRejectedValue(new Error('CLI session is not running'))
+    const append = spyOn(sessionService, 'appendSessionTaskNotification').mockResolvedValue()
+    handleWebSocket.open(ws)
+    ws.sent.length = 0
+
+    handleWebSocket.message(ws, JSON.stringify({
+      type: 'stop_background_task',
+      taskId: 'bdlrow0cg',
+    }))
+    await flushMicrotasks()
+
+    expect(requestControl).not.toHaveBeenCalled()
+    expect(append).toHaveBeenCalledWith(sessionId, expect.objectContaining({
+      taskId: 'bdlrow0cg',
+      status: 'stopped',
+    }))
+    const sent = ws.sent.map((payload) => JSON.parse(payload))
+    expect(sent.some((payload) => payload.type === 'background_task_stop_failed')).toBe(false)
+    expect(sent).toContainEqual(expect.objectContaining({
+      type: 'system_notification',
+      subtype: 'task_notification',
+      data: expect.objectContaining({ task_id: 'bdlrow0cg', status: 'stopped' }),
+    }))
   })
 
   it('rejects malformed background task ids without throwing from the async handler', async () => {
@@ -4196,6 +4326,107 @@ describe('WebSocket handler session isolation', () => {
     }
   })
 
+  it('switches Fast mode on and off through WS, restarts the child, and restores metadata on reconnect', async () => {
+    const sessionId = `fast-mode-${crypto.randomUUID()}`
+    const ws = makeClientSocket(sessionId)
+    const launchInfo = {
+      filePath: '/tmp/fast-mode.jsonl', projectDir: '/tmp', workDir: '/tmp',
+      transcriptMessageCount: 0, customTitle: null,
+      runtimeProviderId: 'openai-official', runtimeModelId: 'future-codex-model', openAIFastMode: false,
+    }
+    spyOn(sessionService, 'getSessionLaunchInfo').mockImplementation(async () => launchInfo)
+    spyOn(sessionService, 'appendSessionMetadata').mockImplementation(async (_id, metadata) => { Object.assign(launchInfo, metadata) })
+    spyOn(conversationService, 'getSessionWorkDir').mockReturnValue('/tmp')
+    spyOn(conversationService, 'hasSession').mockReturnValue(true)
+    spyOn(conversationService, 'stopSession').mockImplementation(() => {})
+    const start = spyOn(conversationService, 'startSession').mockResolvedValue()
+    for (const value of [true, false]) {
+      handleWebSocket.open(ws)
+      handleWebSocket.message(ws, JSON.stringify({ type: 'set_runtime_config', providerId: 'openai-official', modelId: 'future-codex-model', openAIFastMode: value }))
+      for (let attempt = 0; attempt < 30 && start.mock.calls.length < (value ? 1 : 2); attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 10))
+      }
+      expect(start).toHaveBeenLastCalledWith(sessionId, '/tmp', expect.any(String), expect.objectContaining({ providerId: 'openai-official', openAIFastMode: value }))
+      expect(launchInfo.openAIFastMode).toBe(value)
+      expect(ws.sent.map(payload => JSON.parse(payload))).toContainEqual(expect.objectContaining({ type: 'runtime_config_applied', openAIFastMode: value }))
+      closeSessionConnection(sessionId)
+      expect((await getRuntimeSettings(sessionId)).openAIFastMode).toBe(value)
+    }
+  })
+
+  it('rejects Fast toggles on started side chats instead of acknowledging a stale child env', async () => {
+    const sessionId = `side-fast-${crypto.randomUUID()}`
+    const ws = makeClientSocket(sessionId)
+    spyOn(sideChatRegistry, 'getSideChat').mockReturnValue({
+      sessionId, parentSessionId: 'parent-fast', cliSessionId: 'side-fast-cli',
+      resumePath: '/tmp/side-fast.jsonl', resumeAt: 'boundary',
+      createdAt: new Date().toISOString(), started: true, closed: false,
+      launchInfo: {
+        filePath: '/tmp/side-fast.jsonl', projectDir: '/tmp', workDir: '/tmp',
+        transcriptMessageCount: 0, customTitle: null,
+        runtimeProviderId: 'openai-official', runtimeModelId: 'gpt-6-sol', openAIFastMode: false,
+      },
+    })
+    spyOn(conversationService, 'hasSession').mockReturnValue(true)
+    const setModel = spyOn(conversationService, 'setModel').mockResolvedValue(true)
+    handleWebSocket.message(ws, JSON.stringify({ type: 'set_runtime_config', providerId: 'openai-official', modelId: 'gpt-6-sol', openAIFastMode: true }))
+    for (let attempt = 0; attempt < 30 && ws.sent.length === 0; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 10))
+    }
+    expect(ws.sent.map(payload => JSON.parse(payload))).toContainEqual(expect.objectContaining({ type: 'error', code: 'SIDE_CHAT_RUNTIME_RESTART_UNAVAILABLE' }))
+    expect(setModel).not.toHaveBeenCalled()
+  })
+
+  it('preserves OAuth Fast mode when ExitPlanMode only changes the model', async () => {
+    const sessionId = `fast-plan-${crypto.randomUUID()}`
+    const ws = makeClientSocket(sessionId)
+    const launchInfo = {
+      filePath: '/tmp/fast-plan.jsonl', projectDir: '/tmp', workDir: '/tmp', transcriptMessageCount: 0,
+      customTitle: null, runtimeProviderId: 'openai-official', runtimeModelId: 'gpt-6-sol', openAIFastMode: true,
+    }
+    spyOn(sessionService, 'getSessionLaunchInfo').mockImplementation(async () => launchInfo)
+    spyOn(sessionService, 'appendSessionMetadata').mockResolvedValue()
+    spyOn(conversationService, 'hasSession').mockReturnValue(true)
+    spyOn(conversationService, 'getPendingPermissionToolName').mockReturnValue('ExitPlanMode')
+    spyOn(conversationService, 'getSessionWorkDir').mockReturnValue('/tmp')
+    spyOn(conversationService, 'setModel').mockResolvedValue(true)
+    const respond = spyOn(conversationService, 'respondToPermission').mockReturnValue(true)
+    const start = spyOn(conversationService, 'startSession').mockResolvedValue()
+    handleWebSocket.open(ws)
+    handleWebSocket.message(ws, JSON.stringify({
+      type: 'permission_response', requestId: 'fast-plan-permission', allowed: true,
+      runtimeOverride: { providerId: 'openai-official', modelId: 'future-codex-model' },
+    }))
+    for (let attempt = 0; attempt < 30 && respond.mock.calls.length === 0; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 10))
+    }
+    expect((await getRuntimeSettings(sessionId)).openAIFastMode).toBe(true)
+    expect(start).not.toHaveBeenCalled()
+    expect(respond).toHaveBeenCalled()
+    expect(conversationService.setModel).toHaveBeenCalledWith(sessionId, 'future-codex-model')
+  })
+
+  it('does not accept a Fast mode flag on non-OAuth runtime selections', async () => {
+    mockSavedDeepSeekProvider()
+    const sessionId = `fast-other-provider-${crypto.randomUUID()}`
+    const ws = makeClientSocket(sessionId)
+    spyOn(sessionService, 'getSessionLaunchInfo').mockResolvedValue({
+      filePath: '/tmp/fast-other.jsonl', projectDir: '/tmp', workDir: '/tmp', transcriptMessageCount: 0,
+      customTitle: null, runtimeProviderId: 'deepseek', runtimeModelId: 'deepseek-v4-flash',
+    })
+    spyOn(sessionService, 'appendSessionMetadata').mockResolvedValue()
+    spyOn(conversationService, 'getSessionWorkDir').mockReturnValue('/tmp')
+    spyOn(conversationService, 'hasSession').mockReturnValue(false)
+    handleWebSocket.open(ws)
+    handleWebSocket.message(ws, JSON.stringify({ type: 'set_runtime_config', providerId: 'deepseek', modelId: 'deepseek-v4-flash', openAIFastMode: true }))
+    for (let attempt = 0; attempt < 30 && !ws.sent.some(payload => JSON.parse(payload).type === 'runtime_config_applied'); attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 10))
+    }
+    expect(await getRuntimeSettings(sessionId)).toMatchObject({ providerId: 'deepseek', openAIFastMode: false })
+    expect(ws.sent.map(payload => JSON.parse(payload)).find(message => message.type === 'runtime_config_applied')?.openAIFastMode).toBeUndefined()
+    expect(sessionService.appendSessionMetadata).toHaveBeenCalledWith(sessionId, expect.objectContaining({ openAIFastMode: false }))
+  })
+
   it('preserves effort through a same-provider model-only plan approval and session restoration', async () => {
     mockSavedDeepSeekProvider()
     const sessionId = `plan-same-provider-${crypto.randomUUID()}`
@@ -4250,6 +4481,7 @@ describe('WebSocket handler session isolation', () => {
       runtimeProviderId: 'deepseek',
       runtimeModelId: 'deepseek-v4-flash',
       effortLevel: 'high',
+      openAIFastMode: false,
     })
     expect(startSession).not.toHaveBeenCalled()
     expect(stopSession).not.toHaveBeenCalled()

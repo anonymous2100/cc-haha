@@ -1917,6 +1917,149 @@ describe('ConversationService', () => {
     }
   })
 
+  describe('transcript estimates for sessions whose recorded provider cannot supply the window (#1547)', () => {
+    async function estimateWindow(options: {
+      responseModel: string
+      runtimeProviderId: string | null
+      providerModels: Record<'main' | 'haiku' | 'sonnet' | 'opus', string>
+      modelContextWindows: Record<string, number>
+      inputTokens: number
+    }) {
+      const previousConfigDir = process.env.CLAUDE_CONFIG_DIR
+      const previousNodeEnv = process.env.NODE_ENV
+      const previousModelContextWindows = process.env.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS
+      const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-transcript-1547-'))
+      const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-workdir-1547-'))
+      process.env.CLAUDE_CONFIG_DIR = tmpConfigDir
+      process.env.NODE_ENV = 'development'
+      delete process.env.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS
+
+      try {
+        const providerService = new ProviderService()
+        const provider = await providerService.addProvider({
+          presetId: 'custom',
+          name: 'DeepSeek',
+          apiKey: 'provider-key',
+          authStrategy: 'auth_token',
+          baseUrl: 'https://api.deepseek.com/anthropic',
+          apiFormat: 'anthropic',
+          models: options.providerModels,
+          modelContextWindows: options.modelContextWindows,
+        })
+        await providerService.activateProvider(provider.id)
+
+        const svc = new SessionService()
+        const { sessionId, workDir: sessionWorkDir } = await svc.createSession(workDir)
+        await svc.appendSessionMetadata(sessionId, {
+          workDir: sessionWorkDir,
+          runtimeProviderId: options.runtimeProviderId,
+          runtimeModelId: options.responseModel,
+        })
+        const found = await svc.findSessionFile(sessionId)
+        expect(found).not.toBeNull()
+        await fs.appendFile(found!.filePath, JSON.stringify({
+          type: 'assistant',
+          uuid: crypto.randomUUID(),
+          timestamp: '2026-10-13T12:00:00.000Z',
+          cwd: sessionWorkDir,
+          version: '999.0.0-test',
+          message: {
+            role: 'assistant',
+            model: options.responseModel,
+            content: [{ type: 'text', text: 'hello' }],
+            usage: { input_tokens: options.inputTokens, output_tokens: 20 },
+          },
+        }) + '\n')
+
+        return await svc.getTranscriptContextEstimate(sessionId)
+      } finally {
+        if (previousConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR
+        else process.env.CLAUDE_CONFIG_DIR = previousConfigDir
+        if (previousNodeEnv === undefined) delete process.env.NODE_ENV
+        else process.env.NODE_ENV = previousNodeEnv
+        if (previousModelContextWindows === undefined) delete process.env.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS
+        else process.env.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS = previousModelContextWindows
+        await fs.rm(tmpConfigDir, { recursive: true, force: true })
+        await fs.rm(workDir, { recursive: true, force: true })
+      }
+    }
+
+    const deepseekModels = {
+      main: 'deepseek-v4-flash-vision-exp',
+      haiku: 'deepseek-v4-flash',
+      sonnet: 'deepseek-v4-flash-vision-exp',
+      opus: 'deepseek-v4-pro',
+    }
+    const deepseekWindows = {
+      'deepseek-v4-flash-vision-exp': 1_048_576,
+      'deepseek-v4-flash': 1_048_576,
+      'deepseek-v4-pro': 1_048_576,
+    }
+
+    it('uses the active provider when the recorded provider id no longer exists', async () => {
+      const estimate = await estimateWindow({
+        responseModel: 'deepseek-v4-flash-vision-exp',
+        runtimeProviderId: 'deleted-provider-id',
+        providerModels: deepseekModels,
+        modelContextWindows: deepseekWindows,
+        inputTokens: 418_457,
+      })
+
+      expect(estimate?.rawMaxTokens).toBe(1_048_576)
+      // Not clamped to a 200K guess: the real prompt size is preserved.
+      expect(estimate?.totalTokens).toBeGreaterThan(400_000)
+      expect(estimate?.percentage).toBeLessThan(100)
+    })
+
+    it('infers the saved provider window for a non-Claude model recorded without a provider', async () => {
+      const estimate = await estimateWindow({
+        responseModel: 'deepseek-v4-flash-vision-exp',
+        runtimeProviderId: null,
+        providerModels: deepseekModels,
+        modelContextWindows: deepseekWindows,
+        inputTokens: 418_457,
+      })
+
+      expect(estimate?.rawMaxTokens).toBe(1_048_576)
+      expect(estimate?.totalTokens).toBeGreaterThan(400_000)
+    })
+
+    it('keeps the built-in window for a Claude model recorded as Claude Official', async () => {
+      const estimate = await estimateWindow({
+        responseModel: 'claude-sonnet-4-6',
+        runtimeProviderId: null,
+        providerModels: {
+          main: 'claude-sonnet-4-6',
+          haiku: 'claude-sonnet-4-6',
+          sonnet: 'claude-sonnet-4-6',
+          opus: 'claude-sonnet-4-6',
+        },
+        modelContextWindows: { 'claude-sonnet-4-6': 1_000_000 },
+        inputTokens: 1_000,
+      })
+
+      expect(estimate?.rawMaxTokens).toBe(200_000)
+    })
+
+    it('keeps the catalog window for an OpenAI model another provider configures differently', async () => {
+      const estimate = await estimateWindow({
+        responseModel: 'gpt-5.6-terra',
+        runtimeProviderId: null,
+        providerModels: {
+          main: 'gpt-5.6-terra',
+          haiku: 'gpt-5.6-terra',
+          sonnet: 'gpt-5.6-terra',
+          opus: 'gpt-5.6-terra',
+        },
+        modelContextWindows: { 'gpt-5.6-terra': 64_000 },
+        inputTokens: 1_000,
+      })
+
+      expect(estimate?.rawMaxTokens).not.toBe(64_000)
+      expect(estimate?.rawMaxTokens).toBeGreaterThan(200_000)
+    })
+  })
+
   it('should not report transcript context as full for low-trust media usage spikes', async () => {
     const previousConfigDir = process.env.CLAUDE_CONFIG_DIR
     const previousNodeEnv = process.env.NODE_ENV
@@ -3530,6 +3673,8 @@ describe('WebSocket Chat Integration', () => {
       scopes: ['user:inference'],
       subscriptionType: 'pro',
     })
+    // Starting the CLI looks the account up through the profile endpoint.
+    hahaOAuthService.setFetchAccountUuidFn(async () => 'account-uuid-from-profile')
     const settingsService = new SettingsService()
     const previousSettings = await settingsService.getUserSettings()
     await settingsService.updateUserSettings({ model: 'opus[1m]' })
@@ -3581,6 +3726,7 @@ describe('WebSocket Chat Integration', () => {
       conversationService.startSession = originalStartSession
       conversationService.stopSession(sessionId)
       await hahaOAuthService.deleteTokens()
+      hahaOAuthService.setFetchAccountUuidFn()
       await fs.writeFile(
         path.join(tmpDir, 'settings.json'),
         JSON.stringify(previousSettings, null, 2),
@@ -4879,7 +5025,9 @@ describe('WebSocket Chat Integration', () => {
   }, 20_000)
 
   it('should defer bypass permission changes until the active turn completes without restarting', async () => {
-    await withMockStreamDelay(350, async () => {
+    // The inspection below must land while the turn is still streaming. 350ms left
+    // too little headroom on a busy CI runner, where the turn could finish first.
+    await withMockStreamDelay(1_500, async () => {
       await fetch(`${baseUrl}/api/permissions/mode`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -4921,6 +5069,14 @@ describe('WebSocket Chat Integration', () => {
             ws.close()
             reject(new Error(`Timed out waiting for active-turn permission switch for session ${sessionId}`))
           }, 10_000)
+          // Resolve only once all three have happened: settling on the first two let
+          // a slow inspection response arrive after the assertions had already run.
+          const settleIfDone = () => {
+            if (turnComplete && modeConfirmed && deferredInspectionChecked) {
+              clearTimeout(timeout)
+              resolve()
+            }
+          }
 
           ws.onmessage = async (event) => {
             const msg = JSON.parse(event.data as string)
@@ -4964,25 +5120,20 @@ describe('WebSocket Chat Integration', () => {
                 reject(new Error(`Deferred permission switch was exposed before restart: ${inspectionBody.status?.permissionMode}`))
                 return
               }
+              settleIfDone()
               return
             }
 
             if (msg.type === 'permission_mode_changed' && msg.mode === 'bypassPermissions') {
               modeConfirmed = true
-              if (turnComplete) {
-                clearTimeout(timeout)
-                resolve()
-              }
+              settleIfDone()
               return
             }
 
             if (msg.type === 'message_complete' && switchTriggered && !turnComplete) {
               turnComplete = true
               expect(startCalls).toHaveLength(1)
-              if (modeConfirmed) {
-                clearTimeout(timeout)
-                resolve()
-              }
+              settleIfDone()
               return
             }
           }

@@ -17,6 +17,7 @@ import {
   IMAGE_GENERATION_MODEL_ENV_KEY,
   IMAGE_GENERATION_PROVIDER_ID_ENV_KEY,
   IMAGE_GENERATION_PROVIDER_KIND_ENV_KEY,
+  IMAGE_GENERATION_PROTOCOL_ENV_KEY,
 } from '../../services/imageGeneration/config.js'
 import { PROVIDER_PRESETS } from '../config/providerPresets.js'
 import type {
@@ -27,6 +28,7 @@ import type {
 } from '../types/provider.js'
 import {
   BUILT_IN_PROVIDER_IDS,
+  DEEPSEEK_ACCOUNT_PROVIDER_ID,
   GROK_OFFICIAL_PROVIDER_ID,
   OPENAI_OFFICIAL_PROVIDER_ID,
   PROVIDER_TOOL_SEARCH_OPT_IN_SCHEMA_VERSION,
@@ -47,6 +49,13 @@ import {
   buildGrokOfficialRuntimeEnv,
   isGrokOfficialProviderId,
 } from './grokOfficialProvider.js'
+import {
+  DEEPSEEK_ACCOUNT_PROVIDER,
+  DEEPSEEK_OAUTH_FILE_ENV_KEY,
+  DEEPSEEK_OAUTH_PROVIDER_ENV_KEY,
+  applyDeepSeekAccountRuntimeEnv,
+  isDeepSeekAccountProviderId,
+} from './deepseekAccountProvider.js'
 
 export const MANAGED_PROVIDER_ENV_KEYS = [
   'ANTHROPIC_BASE_URL',
@@ -73,11 +82,14 @@ export const MANAGED_PROVIDER_ENV_KEYS = [
   OPENAI_CODEX_OAUTH_FILE_ENV_KEY,
   GROK_OAUTH_PROVIDER_ENV_KEY,
   GROK_OAUTH_FILE_ENV_KEY,
+  DEEPSEEK_OAUTH_PROVIDER_ENV_KEY,
+  DEEPSEEK_OAUTH_FILE_ENV_KEY,
   IMAGE_GENERATION_PROVIDER_KIND_ENV_KEY,
   IMAGE_GENERATION_PROVIDER_ID_ENV_KEY,
   IMAGE_GENERATION_BASE_URL_ENV_KEY,
   IMAGE_GENERATION_API_KEY_ENV_KEY,
   IMAGE_GENERATION_MODEL_ENV_KEY,
+  IMAGE_GENERATION_PROTOCOL_ENV_KEY,
 ] as const
 
 const AUTH_ENV_KEYS = new Set(['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'])
@@ -129,7 +141,8 @@ function isSavedProvider(value: unknown): value is SavedProvider {
       runtimeKind === undefined ||
       runtimeKind === 'anthropic_compatible' ||
       runtimeKind === 'openai_oauth' ||
-      runtimeKind === 'grok_oauth'
+      runtimeKind === 'grok_oauth' ||
+      runtimeKind === 'deepseek_oauth'
     ) &&
     isProviderModels(value.models) &&
     (value.model1mSupport === undefined || isProviderModel1mSupport(value.model1mSupport)) &&
@@ -191,9 +204,12 @@ export function normalizeImageGeneration(
 ): SavedProvider['imageGeneration'] | undefined {
   const model = value?.model.trim()
   if (!model) return undefined
+  const { model: _model, baseUrl: _baseUrl, apiKey: _apiKey, protocol, ...rest } = value!
   const baseUrl = value?.baseUrl?.trim()
   const apiKey = value?.apiKey?.trim()
   return {
+    ...rest,
+    protocol: protocol ?? 'openai_images',
     model,
     ...(baseUrl ? { baseUrl } : {}),
     ...(apiKey ? { apiKey } : {}),
@@ -259,6 +275,7 @@ function buildImageGenerationManagedEnv(
     [IMAGE_GENERATION_BASE_URL_ENV_KEY]: imageGeneration.baseUrl ?? provider.baseUrl,
     [IMAGE_GENERATION_API_KEY_ENV_KEY]: imageGeneration.apiKey ?? provider.apiKey,
     [IMAGE_GENERATION_MODEL_ENV_KEY]: imageGeneration.model,
+    [IMAGE_GENERATION_PROTOCOL_ENV_KEY]: imageGeneration.protocol ?? 'openai_images',
   }
 }
 
@@ -323,7 +340,8 @@ export function normalizeProvidersIndex(value: unknown): ProvidersIndex | null {
   const activeId = rawActiveId && (
     providers.some((provider) => provider.id === rawActiveId) ||
     isOpenAIOfficialProviderId(rawActiveId) ||
-    isGrokOfficialProviderId(rawActiveId)
+    isGrokOfficialProviderId(rawActiveId) ||
+    isDeepSeekAccountProviderId(rawActiveId)
   )
     ? rawActiveId
     : null
@@ -499,6 +517,16 @@ export function buildProviderManagedEnv(
   if (provider.runtimeKind === 'grok_oauth') {
     return buildGrokOfficialRuntimeEnv(provider.models)
   }
+  if (provider.runtimeKind === 'deepseek_oauth') {
+    // Same request shape as the DeepSeek API provider; only the credential
+    // differs (see applyDeepSeekAccountRuntimeEnv).
+    return applyDeepSeekAccountRuntimeEnv(
+      buildProviderManagedEnv(
+        { ...provider, runtimeKind: 'anthropic_compatible', apiKey: '' },
+        options,
+      ),
+    )
+  }
 
   const apiFormat: ApiFormat = resolveProviderApiFormat(provider)
   // Anthropic-format providers normally connect directly to the upstream. When
@@ -571,6 +599,13 @@ export function readActiveProviderManagedEnv(
     if (isGrokOfficialProviderId(index.activeId)) {
       return buildGrokOfficialRuntimeEnv(index.officialProviderModels[GROK_OFFICIAL_PROVIDER_ID])
     }
+    if (isDeepSeekAccountProviderId(index.activeId)) {
+      const models = index.officialProviderModels[DEEPSEEK_ACCOUNT_PROVIDER_ID]
+      return buildProviderManagedEnv(
+        { ...DEEPSEEK_ACCOUNT_PROVIDER, ...(models && { models }) },
+        { serverPort: options?.serverPort },
+      )
+    }
 
     const provider = index.providers.find((entry) => entry.id === index.activeId)
     if (!provider) return null
@@ -590,7 +625,8 @@ export function activeProviderNeedsProxy(configDir: string): boolean {
     if (
       !index?.activeId ||
       isOpenAIOfficialProviderId(index.activeId) ||
-      isGrokOfficialProviderId(index.activeId)
+      isGrokOfficialProviderId(index.activeId) ||
+      isDeepSeekAccountProviderId(index.activeId)
     ) {
       return false
     }

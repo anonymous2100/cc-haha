@@ -6,11 +6,15 @@ name: Full Quality
 # select. This workflow closes them, without any model, provider, or repository
 # secret.
 #
-# Manual only, on purpose. It is here so the full sweep is one click away, not so
-# it runs on its own — deciding when to spend an hour and a half of CI is the
-# maintainer's call, not this file's.
+# Daily, plus one click away. The maintainer chose a daily sweep (2026-10) once
+# main was made green: a red main that nobody re-checks is what turned the PR gate
+# into noise. Daily rather than per push, because a full sweep takes about ninety
+# minutes and the per-push PR Quality run already covers what each merge touched.
 
 on:
+  schedule:
+    # 19:00 UTC = 03:00 Beijing, outside working hours.
+    - cron: '0 19 * * *'
   workflow_dispatch:
     inputs:
       skip_coverage:
@@ -38,6 +42,10 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
+      # Agent and skill discovery lists files through ripgrep; without it the
+      # runtime suites see every created agent as missing (HTTP 500).
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
       - name: Install root dependencies
         run: bun install --frozen-lockfile
       - name: Install desktop dependencies
@@ -53,6 +61,8 @@ jobs:
         run: bun run check:policy
       - name: Deterministic agent flow
         run: bun run check:agent-flow
+      - name: Agent loop against a mock LLM and recorded traffic
+        run: bun run check:agent-e2e
       - name: Root runtime tests
         run: bun run check:server
       - name: Provider contracts
@@ -88,6 +98,7 @@ jobs:
           name: nightly-quality
           path: |
             artifacts/agent-flow/
+            artifacts/agent-e2e/
             artifacts/desktop-ui-smoke/
             artifacts/coverage/
           retention-days: 14

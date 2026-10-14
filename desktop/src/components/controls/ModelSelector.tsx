@@ -40,6 +40,11 @@ import {
   GROK_OFFICIAL_MODELS,
   GROK_OFFICIAL_PROVIDER_ID,
 } from '../../constants/grokOfficialProvider'
+import { useHahaDeepSeekOAuthStore } from '../../stores/hahaDeepSeekOAuthStore'
+import {
+  DEEPSEEK_ACCOUNT_PROVIDER_ID,
+  buildDeepSeekAccountProvider,
+} from '../../constants/deepseekAccountProvider'
 import { MobileBottomSheet } from '@/components/ui/MobileBottomSheet'
 import { SearchField } from '@/components/ui/SearchField'
 import { ReasoningEffortPopover } from './ReasoningEffortPopover'
@@ -131,6 +136,23 @@ function officialChoices(
   }
 }
 
+/**
+ * The account login serves the same DeepSeek models as the API-key provider,
+ * so its rows are built exactly like a saved provider's from the bundled preset.
+ */
+function deepSeekAccountChoice(
+  activeId: string | null,
+  providerName: string,
+  labels: Record<ModelSlot, string>,
+): ProviderChoice {
+  return {
+    providerId: DEEPSEEK_ACCOUNT_PROVIDER_ID,
+    providerName,
+    isDefault: activeId === DEEPSEEK_ACCOUNT_PROVIDER_ID,
+    models: buildProviderModels(buildDeepSeekAccountProvider(), labels),
+  }
+}
+
 function mergeOfficialModels(availableModels: ModelInfo[]): ModelInfo[] {
   const merged = [...OFFICIAL_MODELS]
   const knownIds = new Set(merged.map(model => model.id))
@@ -192,10 +214,12 @@ function buildProviderChoices(
   officialName: string,
   openAIOfficialName: string,
   grokOfficialName: string,
+  deepSeekAccountName: string,
   labels: Record<ModelSlot, string>,
   claudeOfficialLoggedIn: boolean,
   openAIOfficialLoggedIn: boolean,
   grokOfficialLoggedIn: boolean,
+  deepSeekAccountLoggedIn: boolean,
 ): ProviderChoice[] {
   const claudeOfficialModels = activeId === null && availableModels.length > 0
     ? mergeOfficialModels(availableModels)
@@ -227,6 +251,9 @@ function buildProviderChoices(
       activeId === GROK_OFFICIAL_PROVIDER_ID,
       grokOfficialName,
     ))
+  }
+  if (deepSeekAccountLoggedIn) {
+    choices.push(deepSeekAccountChoice(activeId, deepSeekAccountName, labels))
   }
 
   for (const provider of providers) {
@@ -282,6 +309,8 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, Props>(function Mod
   const fetchOpenAIOAuthStatus = useHahaOpenAIOAuthStore((s) => s.fetchStatus)
   const grokOAuthStatus = useHahaGrokOAuthStore((s) => s.status)
   const fetchGrokOAuthStatus = useHahaGrokOAuthStore((s) => s.fetchStatus)
+  const deepSeekOAuthStatus = useHahaDeepSeekOAuthStore((s) => s.status)
+  const fetchDeepSeekOAuthStatus = useHahaDeepSeekOAuthStore((s) => s.fetchStatus)
   const runtimeSelection = useSessionRuntimeStore((state) =>
     runtimeKey ? state.selections[runtimeKey] : undefined,
   )
@@ -333,7 +362,15 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, Props>(function Mod
     void fetchClaudeOAuthStatus()
     void fetchOpenAIOAuthStatus()
     void fetchGrokOAuthStatus()
-  }, [fetchClaudeOAuthStatus, fetchGrokOAuthStatus, fetchOpenAIOAuthStatus, isRuntimeScoped, open])
+    void fetchDeepSeekOAuthStatus()
+  }, [
+    fetchClaudeOAuthStatus,
+    fetchDeepSeekOAuthStatus,
+    fetchGrokOAuthStatus,
+    fetchOpenAIOAuthStatus,
+    isRuntimeScoped,
+    open,
+  ])
 
   const closeSelector = useCallback(() => setOpen(false), [])
 
@@ -418,12 +455,24 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, Props>(function Mod
       t('settings.providers.officialName'),
       t('settings.providers.openaiOfficialName'),
       t('settings.providers.grokOfficialName'),
+      t('settings.providers.deepseekAccountName'),
       roleLabels,
       claudeOAuthStatus?.loggedIn === true,
       openAIOAuthStatus?.loggedIn === true,
       grokOAuthStatus?.loggedIn === true,
+      deepSeekOAuthStatus?.loggedIn === true,
     ),
-    [activeId, availableModels, providers, roleLabels, t, claudeOAuthStatus, grokOAuthStatus, openAIOAuthStatus],
+    [
+      activeId,
+      availableModels,
+      providers,
+      roleLabels,
+      t,
+      claudeOAuthStatus,
+      grokOAuthStatus,
+      openAIOAuthStatus,
+      deepSeekOAuthStatus,
+    ],
   )
   const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase()
   const selectableModels = isControlled && models ? models : availableModels
@@ -480,7 +529,9 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, Props>(function Mod
           ? officialChoices(OPENAI_OFFICIAL_PROVIDER_ID, activeId === OPENAI_OFFICIAL_PROVIDER_ID && availableModels.length ? availableModels : OPENAI_OFFICIAL_MODELS, activeId === OPENAI_OFFICIAL_PROVIDER_ID, t('settings.providers.openaiOfficialName'))
           : activeRuntimeSelection.providerId === GROK_OFFICIAL_PROVIDER_ID
             ? officialChoices(GROK_OFFICIAL_PROVIDER_ID, activeId === GROK_OFFICIAL_PROVIDER_ID && availableModels.length ? availableModels : GROK_OFFICIAL_MODELS, activeId === GROK_OFFICIAL_PROVIDER_ID, t('settings.providers.grokOfficialName'))
-            : null)
+            : activeRuntimeSelection.providerId === DEEPSEEK_ACCOUNT_PROVIDER_ID
+              ? deepSeekAccountChoice(activeId, t('settings.providers.deepseekAccountName'), roleLabels)
+              : null)
     : null
 
   const selectedRuntimeModel = activeRuntimeSelection
@@ -522,6 +573,7 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, Props>(function Mod
     ? EFFORT_OPTIONS.filter((option) => option.value !== 'xhigh')
     : EFFORT_OPTIONS.filter((option) => supportedRuntimeEfforts.includes(option.value))
   const showEffortPill = canEditRuntimeEffort && !!selectedRuntimeEffort && runtimeEffortOptions.length > 0
+  const showOpenAIFastMode = activeRuntimeSelection?.providerId === OPENAI_OFFICIAL_PROVIDER_ID && lockedProviderId === undefined
 
   const navigateToProviderSettings = useCallback(() => {
     setOpen(false)
@@ -541,7 +593,8 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, Props>(function Mod
     const claudeStatus = useHahaOAuthStore.getState().status
     const openAIStatus = useHahaOpenAIOAuthStore.getState().status
     const grokStatus = useHahaGrokOAuthStore.getState().status
-    const statuses = [claudeStatus, openAIStatus, grokStatus]
+    const deepSeekStatus = useHahaDeepSeekOAuthStore.getState().status
+    const statuses = [claudeStatus, openAIStatus, grokStatus, deepSeekStatus]
     const providerState = useProviderStore.getState()
     if (providerState.providers.length > 0) {
       setOpen(true)
@@ -571,11 +624,13 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, Props>(function Mod
         fetchClaudeOAuthStatus(),
         fetchOpenAIOAuthStatus(),
         fetchGrokOAuthStatus(),
+        fetchDeepSeekOAuthStatus(),
       ])
       const hasOfficialLogin = [
         useHahaOAuthStore.getState().status,
         useHahaOpenAIOAuthStore.getState().status,
         useHahaGrokOAuthStore.getState().status,
+        useHahaDeepSeekOAuthStore.getState().status,
       ].some((status) => status?.loggedIn === true)
       if (hasOfficialLogin) {
         setOpen(true)
@@ -586,6 +641,7 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, Props>(function Mod
   }, [
     disabled,
     fetchClaudeOAuthStatus,
+    fetchDeepSeekOAuthStatus,
     fetchGrokOAuthStatus,
     fetchOpenAIOAuthStatus,
     isRuntimeScoped,
@@ -622,6 +678,11 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, Props>(function Mod
       ...activeRuntimeSelection,
       effortLevel: level,
     })
+  }
+
+  const handleOpenAIFastModeChange = (enabled: boolean) => {
+    if (!activeRuntimeSelection || !showOpenAIFastMode) return
+    handleRuntimeSelect({ ...activeRuntimeSelection, openAIFastMode: enabled })
   }
 
   const hasMatchingModels = isRuntimeScoped
@@ -727,6 +788,11 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, Props>(function Mod
                             providerId: choice.providerId,
                             modelId: model.id,
                             ...(nextEffort ? { effortLevel: nextEffort } : {}),
+                            ...(choice.providerId === OPENAI_OFFICIAL_PROVIDER_ID &&
+                              activeRuntimeSelection?.providerId === OPENAI_OFFICIAL_PROVIDER_ID &&
+                              activeRuntimeSelection.openAIFastMode !== undefined
+                              ? { openAIFastMode: activeRuntimeSelection.openAIFastMode }
+                              : {}),
                           })
                         }}
                         aria-current={isSelected || undefined}
@@ -890,7 +956,7 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, Props>(function Mod
             ref={effortButtonRef}
             type="button"
             disabled={disabled || lockedProviderId !== undefined}
-            aria-label={`${t('model.effort')}: ${effortLabels[selectedRuntimeEffort]}`}
+            aria-label={`${t('model.effort')}: ${effortLabels[selectedRuntimeEffort]}${showOpenAIFastMode && activeRuntimeSelection?.openAIFastMode ? ` · ${t('model.openAIFastMode')}` : ''}`}
             aria-expanded={effortOpen}
             onClick={() => {
               if (disabled) return
@@ -904,6 +970,9 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, Props>(function Mod
             <span className="inline-flex h-[18px] items-center rounded-full bg-[var(--color-surface-container)] px-1.5 text-[11px]">
               {effortLabels[selectedRuntimeEffort]}
             </span>
+            {showOpenAIFastMode && activeRuntimeSelection?.openAIFastMode && (
+              <span className="text-[11px] text-[var(--color-text-secondary)]">{t('model.openAIFastMode')}</span>
+            )}
             <ChevronDown aria-hidden="true" size={12} strokeWidth={2} className="flex-shrink-0" />
           </button>
         )}
@@ -918,6 +987,10 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, Props>(function Mod
           labels={effortLabels}
           ariaLabel={t('model.effort')}
           onChange={handleRuntimeEffortSelect}
+          {...(showOpenAIFastMode ? {
+            fastMode: activeRuntimeSelection?.openAIFastMode === true,
+            onFastModeChange: handleOpenAIFastModeChange,
+          } : {})}
           onClose={() => setEffortOpen(false)}
         />
       )}

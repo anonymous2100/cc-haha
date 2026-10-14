@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import '@testing-library/jest-dom'
 import { withAgentTeamRequest } from '@/lib/agentTeamRequest'
 import { COMPUTER_USE_ENABLE_REQUEST } from '@/lib/computerUseEnable'
+import { AGENT_TEAMS_NOTICE_STORAGE_KEY, dismissAgentTeamsNotice } from '@/lib/agentTeamsNotice'
 import { readRecentSkills, RECENT_SKILLS_STORAGE_KEY } from '@/lib/recentSkills'
 import { act, StrictMode } from 'react'
 
@@ -252,6 +253,7 @@ describe('ChatInput file mentions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.removeItem(RECENT_SKILLS_STORAGE_KEY)
+    localStorage.removeItem(AGENT_TEAMS_NOTICE_STORAGE_KEY)
     useSideChatStore.setState({ entries: {} })
     useTeamPlanStore.setState({ bySession: {} })
     useTeamStore.setState({ workbenchesBySession: {} })
@@ -2351,6 +2353,17 @@ describe('ChatInput file mentions', () => {
 
     fireEvent.click(screen.getByLabelText('Open composer tools'))
     fireEvent.click((await screen.findByRole('option', { name: /Agent Teams/ })).querySelector('input[type="checkbox"]')!)
+
+    // Arming costs tokens and time, so the first attempt explains that. Cancel
+    // leaves the composer plain; confirming arms it.
+    const notice = await screen.findByRole('dialog')
+    expect(notice).toHaveTextContent('Uses a lot of tokens')
+    fireEvent.click(within(notice).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByTestId('agent-team-chip')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText('Open composer tools'))
+    fireEvent.click((await screen.findByRole('option', { name: /Agent Teams/ })).querySelector('input[type="checkbox"]')!)
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Turn on anyway' }))
     const chip = await screen.findByTestId('agent-team-chip')
     expect(chip).toHaveTextContent('Agent Teams')
 
@@ -2375,6 +2388,7 @@ describe('ChatInput file mentions', () => {
   })
 
   it('disarms Agent Team from the chip before sending', async () => {
+    dismissAgentTeamsNotice()
     render(<ChatInput compact />)
     fireEvent.click(screen.getByLabelText('Open composer tools'))
     fireEvent.click((await screen.findByRole('option', { name: /Agent Teams/ })).querySelector('input[type="checkbox"]')!)
@@ -3531,7 +3545,7 @@ describe('ChatInput file mentions', () => {
 
     async function dictate() {
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Dictate' }))
+        fireEvent.click(screen.getByRole('button', { name: /^Dictate( \(.+\))?$/ }))
       })
       await act(async () => {
         fireEvent.click(await screen.findByRole('button', { name: 'Stop recording and transcribe' }))
@@ -3592,7 +3606,7 @@ describe('ChatInput file mentions', () => {
     it('hands the toolbar row to the recording bar and gives it back', async () => {
       render(<ChatInput />)
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Dictate' }))
+        fireEvent.click(screen.getByRole('button', { name: /^Dictate( \(.+\))?$/ }))
       })
 
       expect(screen.getByTestId('voice-recording-bar')).toBeVisible()
@@ -3605,13 +3619,13 @@ describe('ChatInput file mentions', () => {
 
       expect(screen.queryByTestId('voice-recording-bar')).toBeNull()
       expect(screen.getByTestId('chat-input-toolbar-trailing')).toBeVisible()
-      expect(screen.getByRole('button', { name: 'Dictate' })).toBeVisible()
+      expect(screen.getByRole('button', { name: /^Dictate( \(.+\))?$/ })).toBeVisible()
     })
 
     it('sends the dictated text through the composer\'s own send path', async () => {
       render(<ChatInput />)
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Dictate' }))
+        fireEvent.click(screen.getByRole('button', { name: /^Dictate( \(.+\))?$/ }))
       })
       await act(async () => {
         fireEvent.click(await screen.findByRole('button', { name: 'Transcribe and send' }))
@@ -3664,7 +3678,7 @@ describe('ChatInput file mentions', () => {
     it('abandons the recording when the composer is hidden', async () => {
       const { rerender } = render(<ChatInput sessionId={sessionId} />)
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Dictate' }))
+        fireEvent.click(screen.getByRole('button', { name: /^Dictate( \(.+\))?$/ }))
       })
       await screen.findByRole('button', { name: 'Stop recording and transcribe' })
 

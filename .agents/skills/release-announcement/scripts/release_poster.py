@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Find a release note and render a compact, text-accurate WeChat poster."""
+"""Find a release note and render an editorial, text-accurate WeChat poster."""
 
 import argparse
 import hashlib
@@ -7,6 +7,7 @@ import json
 import re
 import subprocess
 import sys
+from collections import deque
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
@@ -18,6 +19,51 @@ LOGIN_RE = re.compile(r"(?<![A-Za-z0-9._%+-])@([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[
 RELEASE_HEADING_RE = re.compile(r"(?m)^#\s+opencode-haha v\d+\.\d+\.\d+\s*$")
 CLOSING_PUNCTUATION = set("，。、；：！？）》」』】〕”’％")
 OPENING_PUNCTUATION = set("（《「『【〔“‘")
+POSTER_WIDTH = 1080
+MAX_POSTER_HEIGHT = 16000
+MARGIN, RIGHT = 64, 1016
+CONTENT_WIDTH = RIGHT - MARGIN
+# Swiss layout: one signal-orange hero, a paper body, an ink closing band.
+PALETTE = {
+    "signal": "#FF5B23",
+    "paper": "#F1F0EB",
+    "panel": "#E3E1D9",
+    "ink": "#151515",
+    "body": "#3B3B38",
+    "accent_ink": "#A8340B",
+    "night_text": "#F1F0EB",
+    "night_body": "#CFCCC4",
+    "night_rule": "#3A3A38",
+}
+# (path, collection index). Hiragino Sans GB: 0 = W3, 2 = W6; Noto CJK: 2 = SC.
+FONT_CANDIDATES = {
+    "regular": [
+        ("/System/Library/Fonts/Hiragino Sans GB.ttc", 0),
+        ("/System/Library/Fonts/STHeiti Light.ttc", 1),
+        ("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", 2),
+        ("C:/Windows/Fonts/msyh.ttc", 0),
+    ],
+    "bold": [
+        ("/System/Library/Fonts/Hiragino Sans GB.ttc", 2),
+        ("/System/Library/Fonts/STHeiti Medium.ttc", 1),
+        ("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", 2),
+        ("C:/Windows/Fonts/msyhbd.ttc", 0),
+    ],
+    "heavy": [
+        ("/usr/share/fonts/opentype/noto/NotoSansCJK-Black.ttc", 2),
+        ("/System/Library/Fonts/Hiragino Sans GB.ttc", 2),
+        ("/System/Library/Fonts/STHeiti Medium.ttc", 1),
+        ("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", 2),
+        ("C:/Windows/Fonts/msyhbd.ttc", 0),
+    ],
+    # Latin-only numerals: version, item numbers.
+    "display": [
+        ("/System/Library/Fonts/HelveticaNeue.ttc", 9),
+        ("/System/Library/Fonts/Avenir Next Condensed.ttc", 8),
+        ("/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf", 0),
+        ("C:/Windows/Fonts/arialbd.ttf", 0),
+    ],
+}
 
 
 def git(repo, *args):
@@ -80,8 +126,11 @@ def is_explicit_credit(line, login):
 def wrap_lines(value, width, measure):
     result, current = [], ""
     # Latin model names and IDs stay together; CJK wraps character by character.
-    tokens = re.findall(r"[A-Za-z0-9][A-Za-z0-9._/+:-]*|.", str(value), flags=re.DOTALL)
-    for token in tokens:
+    tokens = re.findall(r"@?[A-Za-z0-9][A-Za-z0-9._/+:-]*|.", str(value), flags=re.DOTALL)
+    # An unbroken URL/model name must never escape the image's safe area.
+    pending = deque(part for token in tokens for part in (list(token) if token != "\n" and measure(token) > width else [token]))
+    while pending:
+        token = pending.popleft()
         if token == "\n":
             result.append(current)
             current = ""
@@ -91,15 +140,25 @@ def wrap_lines(value, width, measure):
             if token in CLOSING_PUNCTUATION:
                 tail_match = re.search(r"(?:[A-Za-z0-9._/+:-]+|.)$", current)
                 tail = tail_match.group(0) if tail_match else ""
+                if measure(tail + token) > width:
+                    tail = current[-1]
                 prefix = current[:-len(tail)].rstrip() if tail else ""
                 if prefix:
                     result.append(prefix)
-                    current = tail + token
+                current = tail + token
+                if measure(current) > width:
+                    raise ValueError("排版宽度不足以容纳标点，请增加可用宽度")
+            elif current[-1] in OPENING_PUNCTUATION:
+                prefix = current[:-1].rstrip()
+                if prefix:
+                    result.append(prefix)
+                current = current[-1]
+                if measure(current + token) > width:
+                    if len(token) == 1:
+                        raise ValueError("排版宽度不足以容纳标点，请增加可用宽度")
+                    pending.extendleft(reversed(list(token)))
                 else:
-                    current = trial
-            elif current[-1] in OPENING_PUNCTUATION and len(current) > 1:
-                result.append(current[:-1].rstrip())
-                current = current[-1] + token
+                    current += token
             else:
                 result.append(current.rstrip())
                 current = token.lstrip()
@@ -151,18 +210,13 @@ def scan(repo, requested_version=None):
     }
 
 
-def font_paths(bold):
-    mac = "/System/Library/Fonts/STHeiti Medium.ttc" if bold else "/System/Library/Fonts/STHeiti Light.ttc"
-    linux = "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc" if bold else "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
-    windows = "C:/Windows/Fonts/msyhbd.ttc" if bold else "C:/Windows/Fonts/msyh.ttc"
-    return [mac, linux, windows, "/System/Library/Fonts/Hiragino Sans GB.ttc"]
-
-
-def choose_font_path(bold):
-    for candidate in font_paths(bold):
-        if Path(candidate).is_file():
-            return candidate
-    raise RuntimeError("缺少可用的中文系统字体；请提供宋体、黑体或 Noto CJK 字体")
+def choose_font(role):
+    for path, index in FONT_CANDIDATES[role]:
+        if Path(path).is_file():
+            return path, index
+    if role == "display":
+        return choose_font("bold")
+    raise RuntimeError("缺少可用的中文系统字体；请提供冬青黑体、华文黑体、Noto Sans CJK 或微软雅黑")
 
 
 def check_spec(spec, scan_data, allow_offline_avatars=False):
@@ -196,6 +250,11 @@ def check_spec(spec, scan_data, allow_offline_avatars=False):
         for item in spec[field]:
             if not item.get("title") or not item.get("body"):
                 raise ValueError(f"{field} 每项都需要 title 和 body")
+    if not isinstance(spec.get("extras", []), list):
+        raise ValueError("extras 必须是数组")
+    for extra in spec.get("extras", []):
+        if not all(extra.get(key) for key in ("title", "headline", "body")):
+            raise ValueError("extras 每项需要 title、headline、body")
 
 
 def get_avatar(person, spec_path, avatar_dir, allow_offline_avatars=False):
@@ -237,24 +296,33 @@ def render(spec, scan_data, spec_path, output, allow_offline_avatars=False):
     from PIL import Image, ImageDraw, ImageFont, ImageOps
 
     check_spec(spec, scan_data, allow_offline_avatars)
-    regular_path, bold_path = choose_font_path(False), choose_font_path(True)
-    def face(size, bold=False):
-        return ImageFont.truetype(bold_path if bold else regular_path, size)
+    p = PALETTE
+    margin, right, content_width = MARGIN, RIGHT, CONTENT_WIDTH
+    body_x, body_width = margin + 160, content_width - 160
+    product = str(spec.get("product") or "Claude Code Haha")
+    features, extras, fixes, people = spec["features"], spec.get("extras", []), spec["fixes"], spec["contributors"]
+    faces, strokes, avatars = {}, {}, {}
 
-    W, MAX_H = 1080, 16000
-    paper, ink, muted, rust, line = "#F8F5EE", "#25211D", "#746B62", "#A84D35", "#DED5C9"
-    canvas = Image.new("RGB", (W, MAX_H), paper)
-    draw = ImageDraw.Draw(canvas)
+    def face(size, role="regular"):
+        key = (size, role)
+        if key not in faces:
+            path, index = choose_font(role)
+            faces[key] = ImageFont.truetype(path, size, index=index)
+            # Without a black weight, only display-size headings get a 1px
+            # stroke; thicker strokes fill in dense characters such as 重.
+            strokes[faces[key]] = 1 if role == "heavy" and size >= 60 and "Black" not in path else 0
+        return faces[key]
 
-    def lines(value, text_face, width):
-        return wrap_lines(value, width, lambda text: draw.textlength(text, font=text_face))
+    def avatar(person):
+        if person["login"] not in avatars:
+            photo = get_avatar(person, spec_path, output.parent / "avatars", allow_offline_avatars)
+            avatars[person["login"]] = ImageOps.fit(photo, (96, 96), method=Image.Resampling.LANCZOS)
+        return avatars[person["login"]]
 
-    def write(x, y, value, text_face, color, width, leading=1.38):
-        step = round(text_face.size * leading)
-        for text_line in lines(value, text_face, width):
-            draw.text((x, y), text_line, font=text_face, fill=color)
-            y += step
-        return y
+    def layout(canvas, paint):
+        """Lay out the whole poster; draw only when paint is true. Returns (height, bands)."""
+        draw = ImageDraw.Draw(canvas)
+        bands = []
 
     # Compact hero: the first release content appears in the first phone viewport.
     draw.rectangle((0, 0, W, 230), fill=ink)
@@ -263,88 +331,43 @@ def render(spec, scan_data, spec_path, output, allow_offline_avatars=False):
     draw.text((64, 99), "新版本发布", font=face(63, True), fill="#F4EFE4")
     draw.line((64, 207, 1016, 207), fill=rust, width=4)
 
-    y = 286
-    features = spec["features"]
-    if features:
-        draw.text((64, y), "这次新增", font=face(58, True), fill=ink)
-        draw.text((68, y + 80), "本次最值得关注的变化", font=face(30), fill=muted)
-        y += 150
-        cols = 1 if len(features) == 1 else 2
-        gap_x, gap_y = 28, 28
-        for start in range(0, len(features), cols):
-            row = features[start:start + cols]
-            card_w = 952 if len(row) == 1 else 461
-            dimensions = []
-            for item in row:
-                title_lines = lines(item["title"], face(37, True), card_w - 60)
-                body_lines = lines(item["body"], face(30), card_w - 60)
-                body_top = 87 + len(title_lines) * 45 + 24
-                dimensions.append((title_lines, body_lines, body_top))
-            minimum_height = 240 if len(row) == 1 else 340
-            height = max(minimum_height, *(body_top + len(body_lines) * 42 + 35 for _, body_lines, body_top in dimensions))
-            for col, (item, (_, _, body_top)) in enumerate(zip(row, dimensions)):
-                x = 64 + col * (card_w + gap_x)
-                draw.rounded_rectangle((x, y, x + card_w, y + height), radius=26, fill="#FFFFFF", outline=line, width=2)
-                draw.text((x + 30, y + 28), f"{start + col + 1:02d}", font=face(28, True), fill=rust)
-                write(x + 30, y + 87, item["title"], face(37, True), ink, card_w - 60, 1.22)
-                write(x + 30, y + body_top, item["body"], face(30), muted, card_w - 60, 1.4)
-            y += height + gap_y
-        y += 66
+        def lines(value, text_face, width):
+            return wrap_lines(value, width, lambda text: measure(text, text_face))
 
-    for extra in spec.get("extras", []):
-        if not all(extra.get(key) for key in ("title", "headline", "body")):
-            raise ValueError("extras 每项需要 title、headline、body")
-        draw.text((64, y), extra["title"], font=face(54, True), fill=ink)
-        y += 90
-        head_lines = lines(extra["headline"], face(34, True), 890)
-        body_lines = lines(extra["body"], face(30), 880)
-        box_h = 30 + len(head_lines) * 45 + 20 + len(body_lines) * 40 + 30
-        draw.rounded_rectangle((64, y, 1016, y + box_h), radius=25, fill="#EEE4D7")
-        write(94, y + 30, extra["headline"], face(34, True), ink, 890, 1.32)
-        write(94, y + 30 + len(head_lines) * 45 + 20, extra["body"], face(30), muted, 880, 1.38)
-        y += box_h + 80
+        def put(x, y, text, text_face, color, anchor="lt"):
+            if paint:
+                width = strokes[text_face]
+                x += width if anchor[0] == "l" else -width
+                draw.text((x, y), text, font=text_face, fill=color, anchor=anchor, stroke_width=width, stroke_fill=color)
 
-    if spec["fixes"]:
-        draw.text((64, y), "重点修复", font=face(58, True), fill=ink)
-        draw.text((68, y + 80), "那些真正影响使用的问题", font=face(30), fill=muted)
-        y += 160
-        for index, item in enumerate(spec["fixes"]):
-            row_y = y
-            draw.ellipse((67, y + 16, 83, y + 32), fill=rust)
-            title_end = write(107, y, item["title"], face(34, True), ink, 870, 1.2)
-            body_end = write(107, title_end + 12, item["body"], face(30), muted, 870, 1.36)
-            y = max(row_y + 116, body_end + 24)
-            if index < len(spec["fixes"]) - 1:
-                draw.line((107, y - 13, 1016, y - 13), fill=line, width=2)
-        y += 56
+        def rect(box, **style):
+            if paint:
+                draw.rectangle(box, **style)
 
-    people = spec["contributors"]
-    if people:
-        draw.text((64, y), "感谢社区贡献者", font=face(54, True), fill=ink)
-        draw.text((67, y + 78), "头像与 GitHub ID 来自公开主页", font=face(28), fill=muted)
-        y += 150
-        avatar_dir = output.parent / "avatars"
-        avatars = [(person, get_avatar(person, spec_path, avatar_dir, allow_offline_avatars)) for person in people]
-        for person, photo in avatars:
-            contribution_lines = lines(person["contribution"], face(24), 805)
-            row_h = max(116, 75 + len(contribution_lines) * 31)
-            draw.rounded_rectangle((64, y, 1016, y + row_h), radius=20, fill="#FFFFFF", outline=line, width=2)
-            square = ImageOps.fit(photo, (78, 78), method=Image.Resampling.LANCZOS)
-            mask = Image.new("L", (78, 78))
-            ImageDraw.Draw(mask).ellipse((0, 0, 77, 77), fill=255)
-            canvas.paste(square, (86, y + 19), mask)
-            draw.text((184, y + 23), "@" + person["login"], font=face(30, True), fill=ink)
-            write(184, y + 66, person["contribution"], face(24), muted, 805)
-            y += row_h + 16
-        y += 20
+        def balanced(value, text_face, width):
+            # A paragraph ending on a short tail (an orphaned character or two)
+            # is rebalanced by narrowing the measure while the line count holds.
+            best = lines(value, text_face, width)
+            if len(best) < 2 or measure(best[-1], text_face) >= width / 3:
+                return best
+            low, high = int(width * 0.6), int(width)
+            while low < high:
+                middle = (low + high) // 2
+                try:
+                    trial = lines(value, text_face, middle)
+                except ValueError:
+                    trial = None
+                if trial is not None and len(trial) <= len(best):
+                    high = middle
+                else:
+                    low = middle + 1
+            return lines(value, text_face, high)
 
-    if spec.get("install_note"):
-        note_lines = lines(spec["install_note"], face(27), 885)
-        box_h = 77 + len(note_lines) * 38 + 30
-        draw.rounded_rectangle((64, y, 1016, y + box_h), radius=25, fill=ink)
-        draw.text((96, y + 28), "安装提示", font=face(31, True), fill="#F5D3B4")
-        write(96, y + 76, spec["install_note"], face(27), "#F4EFE4", 885)
-        y += box_h + 68
+        def write(x, y, value, text_face, color, width, leading=1.55, balance=False):
+            for text_line in (balanced if balance else lines)(value, text_face, width):
+                put(x, y, text_line, text_face, color)
+                y += round(text_face.size * leading)
+            return y
 
     draw.text((64, y), f"{spec.get('product') or 'opencode-haha'}  ·  v{spec['version']}", font=face(28, True), fill=ink)
     if spec.get("footer_url"):
@@ -353,8 +376,8 @@ def render(spec, scan_data, spec_path, output, allow_offline_avatars=False):
     if y > MAX_H:
         raise ValueError(f"海报高度 {y}px 超出上限，请减少内容")
     output.parent.mkdir(parents=True, exist_ok=True)
-    canvas.crop((0, 0, W, y)).save(output, optimize=True)
-    return (W, y)
+    canvas.crop((0, 0, POSTER_WIDTH, height)).save(output, optimize=True)
+    return (POSTER_WIDTH, height)
 
 
 def main():

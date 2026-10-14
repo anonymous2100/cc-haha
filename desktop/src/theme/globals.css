@@ -461,7 +461,7 @@
 }
 
 .agent-teams-flow {
-  animation: agent-teams-flow 700ms linear infinite;
+  animation: agent-teams-flow 545ms linear infinite;
 }
 
 /* The collaboration board uses motion only to explain state transitions:
@@ -523,8 +523,10 @@
   100% { opacity: 0; transform: translate(7px, -11px); }
 }
 
+/* Must be a whole multiple of every flowing stroke-dasharray period (all 14px);
+   otherwise the dashes snap back at each loop and the line stutters. */
 @keyframes agent-teams-flow {
-  to { stroke-dashoffset: -18; }
+  to { stroke-dashoffset: -14; }
 }
 
 @keyframes agent-teams-pulse {
@@ -2146,6 +2148,23 @@ body.sidebar-resizing * {
 .markdown-prose.chat-reading-markdown :is(h2, h3):not(:first-child) {
   margin-top: 22px;
 }
+/* An ordered list's number hangs outside the item, in the list's own padding.
+   Prose's fixed 20px holds "1." in a proportional face but not in a monospace
+   one, where "1. " is three full cells and "10. " four — the number then
+   overshoots the reply column, and in wide / full width the column reaches the
+   scroll area's padding edge, so the digit is clipped. Size the gutter in `ch`
+   (the width of "0" in the chosen face): marker = digits + "." + space, each at
+   most one cell. Lists of 10+ / 100+ items grow it a cell at a time. */
+.markdown-prose.chat-reading-markdown ol {
+  padding-inline-start: max(1.25rem, 3ch);
+}
+.markdown-prose.chat-reading-markdown ol:has(> li:nth-child(10)) {
+  padding-inline-start: max(1.25rem, 4ch);
+}
+.markdown-prose.chat-reading-markdown ol:has(> li:nth-child(100)) {
+  padding-inline-start: max(1.25rem, 5ch);
+}
+
 .markdown-prose.chat-reading-markdown code {
   font-family: var(--font-mono);
   font-size: var(--code-viewer-font-size);
