@@ -61,8 +61,8 @@ function resolveUncached(exists: (p: string) => boolean): string | null {
   }
 
   // bundled: in a packaged Electron app this resolver runs inside the spawned
-  // `claude-sidecar` bun binary, which receives `--app-root <appRoot>` and
-  // exports it as CLAUDE_APP_ROOT (see desktop/sidecars/claude-sidecar.ts).
+  // `opencode-haha-sidecar` bun binary, which receives `--app-root <appRoot>` and
+  // exports it as CLAUDE_APP_ROOT (see desktop/sidecars/opencode-haha-sidecar.ts).
   // On packaged macOS that path is `.../Contents/Resources/app.asar`, while the
   // unpacked native binaries live under `.../app.asar.unpacked/src-tauri/binaries`
   // (build-sidecars.ts drops `cu-helper` there and electron-builder asarUnpacks

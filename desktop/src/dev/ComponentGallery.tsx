@@ -406,7 +406,7 @@ function SessionSurfacePreview({ kind }: { kind: 'main' | 'agent' }) {
           leading={isAgent ? <Button variant="ghost" size="xs">← Back</Button> : undefined}
           titleAddon={<Badge tone={isAgent ? 'warning' : 'success'}>{isAgent ? 'running' : 'ready'}</Badge>}
           metadata={[
-            { key: 'project', content: <span>claude-code-haha</span> },
+            { key: 'project', content: <span>opencode-haha</span> },
             { key: 'scope', content: <span>{isAgent ? 'commit-analysis / teams-analyst' : 'main'}</span> },
           ]}
           actions={<IconButton icon={<RefreshCw size={14} strokeWidth={1.75} />} label={`Refresh ${kind} session`} size="sm" />}

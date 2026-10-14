@@ -148,9 +148,9 @@ describe('this repository', () => {
       .toContain('desktop/electron/services/sidecarManager.ts')
     // The desktop CU worker enters the merged sidecar before normal routing.
     expect(dependentsOf(['src/utils/computerUse/replWorker.ts'], graph))
-      .toContain('desktop/sidecars/claude-sidecar.ts')
+      .toContain('desktop/sidecars/opencode-haha-sidecar.ts')
     expect(dependentsOf(['preload.ts'], graph))
-      .toContain('desktop/sidecars/claude-sidecar.ts')
+      .toContain('desktop/sidecars/opencode-haha-sidecar.ts')
   })
 
   test('resolves every repo-local module specifier so selection stays trustworthy', () => {

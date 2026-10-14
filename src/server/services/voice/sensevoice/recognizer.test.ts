@@ -303,10 +303,10 @@ describe('default worker launch', () => {
   })
 
   it('detects compiled executables by their virtual module URLs', () => {
-    expect(isBundledWorkerHost('file:///$bunfs/root/claude-sidecar', false)).toBe(true)
-    expect(isBundledWorkerHost('file:///B:/~BUN/root/claude-sidecar.exe', false)).toBe(true)
-    expect(isBundledWorkerHost('file:///B:/%7EBUN/root/claude-sidecar.exe', false)).toBe(true)
-    expect(isBundledWorkerHost('file:///B:/%7eBUN/root/claude-sidecar.exe', false)).toBe(true)
+    expect(isBundledWorkerHost('file:///$bunfs/root/opencode-haha-sidecar', false)).toBe(true)
+    expect(isBundledWorkerHost('file:///B:/~BUN/root/opencode-haha-sidecar.exe', false)).toBe(true)
+    expect(isBundledWorkerHost('file:///B:/%7EBUN/root/opencode-haha-sidecar.exe', false)).toBe(true)
+    expect(isBundledWorkerHost('file:///B:/%7eBUN/root/opencode-haha-sidecar.exe', false)).toBe(true)
     expect(isBundledWorkerHost('file:///repo/src/server/services/voice/sensevoice/recognizer.ts', false)).toBe(false)
     expect(isBundledWorkerHost('file:///C:/project/~BUN-tools/recognizer.ts', false)).toBe(false)
     expect(isBundledWorkerHost('https://example.test/B:/%7EBUN/root/recognizer.ts', false)).toBe(false)

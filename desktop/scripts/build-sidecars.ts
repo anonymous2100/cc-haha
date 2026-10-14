@@ -54,11 +54,11 @@ await stageHostRipgrepForOfflineBuild()
 
 // 单一合并 sidecar：server / cli 共享一份 bun runtime + 共享依赖代码。
 // 调用方（Electron sidecar manager / legacy Tauri host / conversationService）
-// 通过第一个 positional 参数选择 'server' 或 'cli' 模式，详见 desktop/sidecars/claude-sidecar.ts。
+// 通过第一个 positional 参数选择 'server' 或 'cli' 模式，详见 desktop/sidecars/opencode-haha-sidecar.ts。
 await compileExecutable({
-  entrypoint: path.join(desktopRoot, 'sidecars/claude-sidecar.ts'),
-  outfileBase: path.join(binariesDir, `claude-sidecar-${targetTriple}`),
-  productName: 'Claude Code Sidecar',
+  entrypoint: path.join(desktopRoot, 'sidecars/opencode-haha-sidecar.ts'),
+  outfileBase: path.join(binariesDir, `opencode-haha-sidecar-${targetTriple}`),
+  productName: 'opencode-haha Sidecar',
   bunTarget,
 })
 
@@ -241,7 +241,7 @@ async function compileExecutable({
       autoloadPackageJson: true,
       windows: {
         title: productName,
-        publisher: 'Claude Code',
+        publisher: 'opencode-haha',
         description: productName,
         hideConsole: true,
       },
@@ -271,8 +271,8 @@ async function compileExecutable({
  *
  * The identifier is the reason this is not just `codesign -s -`. Ad-hoc signing
  * derives the identifier from the file name plus a content hash
- * (`claude-sidecar-aarch64-apple-darwin-5555…`), which never matches
- * `com.claude-code-haha.desktop.sidecar`. `ClientAttestation.swift` compares
+ * (`opencode-haha-sidecar-aarch64-apple-darwin-5555…`), which never matches
+ * `com.opencode-haha.desktop.sidecar`. `ClientAttestation.swift` compares
  * that identifier exactly, so a hash-suffixed one makes every Computer Use call
  * fail closed with `unauthorized_client`.
  *
@@ -281,7 +281,7 @@ async function compileExecutable({
  * the policy, which is inherent to having no certificate.
  *
  * electron-builder must not overwrite this signature; `mac.signIgnore` in
- * package.json excludes `claude-sidecar-…` for exactly that reason. That also
+ * package.json excludes `opencode-haha-sidecar-…` for exactly that reason. That also
  * means entitlements are OUR job here — electron-builder's `entitlementsInherit`
  * never reaches a file it does not sign.
  */

@@ -382,7 +382,7 @@ export class ElectronServerRuntime {
       const child = this.deps.spawnSidecar(plan)
       startState = createServerStartState(child)
       this.startingServer = startState
-      this.captureLogs(child, 'claude-server', logs, (code, signal) => {
+      this.captureLogs(child, 'opencode-haha-sidecar', logs, (code, signal) => {
         this.handleServerExit(child, code, signal, logs)
       }, error => {
         this.handleServerError(child, error, logs)
@@ -424,7 +424,7 @@ export class ElectronServerRuntime {
         throw new Error(this.startupError ?? startState.failure.message)
       }
       const message = error instanceof Error ? error.message : String(error)
-      this.deps.appendHostDiagnostic(this.diagnosticsFile, `[claude-server] [startup-error] ${message}`)
+      this.deps.appendHostDiagnostic(this.diagnosticsFile, `[opencode-haha-sidecar] [startup-error] ${message}`)
       this.startupError = formatStartupError(message, logs)
       throw new Error(this.startupError)
     } finally {
@@ -478,7 +478,7 @@ export class ElectronServerRuntime {
           this.deps.killSidecar(child)
           break
         }
-        this.captureLogs(child, `claude-adapters:${label}`)
+        this.captureLogs(child, `opencode-haha-adapters:${label}`)
         this.adapters.push(child)
         ownedAdapters?.push(child)
       } catch (error) {
@@ -530,7 +530,7 @@ export class ElectronServerRuntime {
   ) {
     let adapterControlBuffer = ''
     child.stdout.on('data', chunk => {
-      if (label.startsWith('claude-adapters:')) {
+      if (label.startsWith('opencode-haha-adapters:')) {
         adapterControlBuffer = (adapterControlBuffer + String(chunk)).slice(-16_384)
         const lines = adapterControlBuffer.split('\n')
         adapterControlBuffer = lines.pop() ?? ''
@@ -642,7 +642,7 @@ export class ElectronServerRuntime {
     this.startupError = formatStartupError(`${message}; ${circuitMessage}`, logs)
     this.deps.appendHostDiagnostic(
       this.diagnosticsFile,
-      `[claude-server] [restart-circuit-open] ${circuitMessage}`,
+      `[opencode-haha-sidecar] [restart-circuit-open] ${circuitMessage}`,
     )
     console.error(`[desktop] ${circuitMessage}`)
   }

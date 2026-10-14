@@ -75,7 +75,7 @@ order: 6
 
 ## 终端
 
-内嵌一个真实的宿主机 Shell，用来装插件、技能、MCP 这类需要命令行的东西。桌面端已经内置 `claude-haha` 命令，文档里写 `claude <参数>` 的地方都可以换成 `claude-haha <参数>`。
+内嵌一个真实的宿主机 Shell，用来装插件、技能、MCP 这类需要命令行的东西。桌面端已经内置 `opencode-haha` 命令，文档里写 `claude <参数>` 的地方都可以换成 `opencode-haha <参数>`。
 
 Windows 用户可以在这里指定启动 Shell（系统默认 / PowerShell 7 / Windows PowerShell / 命令提示符 / 自定义可执行文件），以及一个 Bash 路径——工具调用 `grep`、`sed` 这类 Unix 命令时会用到，通常指向 Git Bash。
 

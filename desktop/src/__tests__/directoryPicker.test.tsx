@@ -43,9 +43,9 @@ const PROJECTS: RecentProject[] = [
     sessionCount: 12,
   },
   {
-    projectPath: '/Users/nanmi/workspace/myself_code/claude-code-haha',
-    realPath: '/Users/nanmi/workspace/myself_code/claude-code-haha',
-    projectName: 'claude-code-haha',
+    projectPath: '/Users/nanmi/workspace/myself_code/opencode-haha',
+    realPath: '/Users/nanmi/workspace/myself_code/opencode-haha',
+    projectName: 'opencode-haha',
     isGit: true,
     repoName: 'NanmiCoder/cc-haha',
     branch: 'main',
@@ -123,7 +123,7 @@ describe('DirectoryPicker project list', () => {
     fireEvent.keyDown(search, { key: 'ArrowDown' })
     fireEvent.keyDown(search, { key: 'Enter' })
 
-    expect(onChange).toHaveBeenCalledWith('/Users/nanmi/workspace/myself_code/claude-code-haha')
+    expect(onChange).toHaveBeenCalledWith('/Users/nanmi/workspace/myself_code/opencode-haha')
     await waitFor(() => {
       expect(screen.queryByTestId('directory-picker-menu')).not.toBeInTheDocument()
     })
@@ -160,17 +160,17 @@ describe('DirectoryPicker project list', () => {
 
     // The name defaults to the folder basename; rename it.
     const nameInput = within(dialog).getByLabelText(/项目名称/) as HTMLInputElement
-    await waitFor(() => expect(nameInput.value).toBe('claude-code-haha'))
+    await waitFor(() => expect(nameInput.value).toBe('opencode-haha'))
     fireEvent.change(nameInput, { target: { value: '我的项目' } })
 
     fireEvent.click(within(dialog).getByRole('button', { name: '创建项目' }))
 
     await waitFor(() => {
       expect(desktopUiPreferencesApi.updateProjectDisplayName)
-        .toHaveBeenCalledWith('/Users/nanmi/workspace/myself_code/claude-code-haha', '我的项目')
+        .toHaveBeenCalledWith('/Users/nanmi/workspace/myself_code/opencode-haha', '我的项目')
     })
     await waitFor(() => {
-      expect(onWorkDirChange).toHaveBeenCalledWith('/Users/nanmi/workspace/myself_code/claude-code-haha')
+      expect(onWorkDirChange).toHaveBeenCalledWith('/Users/nanmi/workspace/myself_code/opencode-haha')
     })
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: '创建项目' })).not.toBeInTheDocument()

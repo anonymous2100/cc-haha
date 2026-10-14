@@ -419,7 +419,7 @@ struct StoredServerState {
 
 /// 与 ServerState 平级的 adapter 子进程状态。
 ///
-/// adapter sidecar（claude-sidecar adapters --telegram 等）的生命周期
+/// adapter sidecar（opencode-haha-sidecar adapters --telegram 等）的生命周期
 /// 跟 server 不同：它没有 HTTP 端口可探活，没配凭据时会自己干净退出，
 /// 而且需要支持运行时热重启 —— 用户在设置页保存 IM 凭据后，
 /// 前端会通过 invoke('restart_adapters_sidecar') 来重启它，让新凭据生效。
@@ -736,7 +736,7 @@ fn is_window_state_visible_on_any_monitor(
 fn window_state_path(app: &AppHandle) -> Option<PathBuf> {
     // honour CLAUDE_CONFIG_DIR so portable installs keep window-state.json
     // and terminal-config.json alongside the config dir instead of
-    // %APPDATA%\com.claude-code-haha.desktop\.
+    // %APPDATA%\com.opencode-haha.desktop\.
     resolve_portable_state_path().or_else(|| match app.path().app_config_dir() {
         Ok(dir) => Some(dir.join(WINDOW_STATE_FILE)),
         Err(err) => {
@@ -950,13 +950,13 @@ fn show_main_window(app: &AppHandle) {
 
 fn setup_system_tray(app: &mut tauri::App) -> tauri::Result<()> {
     let menu = MenuBuilder::new(app)
-        .text(TRAY_SHOW_ID, "Show Claude Code Haha")
+        .text(TRAY_SHOW_ID, "Show opencode-haha")
         .separator()
-        .text(TRAY_QUIT_ID, "Quit Claude Code Haha")
+        .text(TRAY_QUIT_ID, "Quit opencode-haha")
         .build()?;
 
     let mut tray = TrayIconBuilder::with_id("main-tray")
-        .tooltip("Claude Code Haha")
+        .tooltip("opencode-haha")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
@@ -1786,7 +1786,7 @@ fn start_server_sidecar(app: &AppHandle) -> Result<ServerRuntime, String> {
     // 单一合并 sidecar：第一个参数选 server / cli / adapters 模式。
     let mut sidecar = app
         .shell()
-        .sidecar("claude-sidecar")
+        .sidecar("opencode-haha-sidecar")
         .map_err(|err| format!("resolve sidecar: {err}"))?;
     for (key, value) in terminal_environment(&default_shell(None)) {
         sidecar = sidecar.env(key, value);
@@ -1836,13 +1836,13 @@ fn start_server_sidecar(app: &AppHandle) -> Result<ServerRuntime, String> {
                 CommandEvent::Stdout(line) => {
                     let line = String::from_utf8_lossy(&line);
                     let line = line.trim_end();
-                    println!("[claude-server] {line}");
+                    println!("[opencode-haha-sidecar] {line}");
                     push_server_startup_log(&logs_for_task, format!("[stdout] {line}"));
                 }
                 CommandEvent::Stderr(line) => {
                     let line = String::from_utf8_lossy(&line);
                     let line = line.trim_end();
-                    eprintln!("[claude-server] {line}");
+                    eprintln!("[opencode-haha-sidecar] {line}");
                     push_server_startup_log(&logs_for_task, format!("[stderr] {line}"));
                 }
                 CommandEvent::Terminated(payload) => {
@@ -1850,7 +1850,7 @@ fn start_server_sidecar(app: &AppHandle) -> Result<ServerRuntime, String> {
                         "sidecar exited (code={:?}, signal={:?})",
                         payload.code, payload.signal
                     );
-                    eprintln!("[claude-server] {line}");
+                    eprintln!("[opencode-haha-sidecar] {line}");
                     push_server_startup_log(&logs_for_task, format!("[exit] {line}"));
                 }
                 _ => {}
@@ -1931,7 +1931,7 @@ fn start_adapters_sidecars(app: &AppHandle) -> Result<Vec<CommandChild>, String>
     ] {
         let mut sidecar = app
             .shell()
-            .sidecar("claude-sidecar")
+            .sidecar("opencode-haha-sidecar")
             .map_err(|err| format!("resolve {label} adapter sidecar: {err}"))?;
         for (key, value) in terminal_environment(&default_shell(None)) {
             sidecar = sidecar.env(key, value);
@@ -1958,18 +1958,18 @@ fn start_adapters_sidecars(app: &AppHandle) -> Result<Vec<CommandChild>, String>
                 match event {
                     CommandEvent::Stdout(line) => {
                         let line = String::from_utf8_lossy(&line);
-                        println!("[claude-adapters:{label}] {}", line.trim_end());
+                        println!("[opencode-haha-adapters:{label}] {}", line.trim_end());
                     }
                     CommandEvent::Stderr(line) => {
                         let line = String::from_utf8_lossy(&line);
-                        eprintln!("[claude-adapters:{label}] {}", line.trim_end());
+                        eprintln!("[opencode-haha-adapters:{label}] {}", line.trim_end());
                     }
                     CommandEvent::Terminated(payload) => {
                         // exit code != 0 是常态：用户没配凭据时 sidecar 内部会
                         // warn + skip + process.exit(1)。这里只 info 一行，
                         // 不要当错误冒泡。
                         println!(
-                            "[claude-adapters:{label}] sidecar exited (code={:?}, signal={:?})",
+                            "[opencode-haha-adapters:{label}] sidecar exited (code={:?}, signal={:?})",
                             payload.code, payload.signal
                         );
                     }
@@ -2101,7 +2101,7 @@ fn kill_stale_unix_adapter_sidecars() {
         if pid == current_pid {
             continue;
         }
-        if !command.contains("claude-sidecar") || !command.contains(" adapters") {
+        if !command.contains("opencode-haha-sidecar") || !command.contains(" adapters") {
             continue;
         }
 
@@ -2112,9 +2112,9 @@ fn kill_stale_unix_adapter_sidecars() {
 #[cfg(target_os = "windows")]
 fn kill_windows_sidecars() {
     for image_name in [
-        "claude-sidecar-x86_64-pc-windows-msvc.exe",
-        "claude-sidecar-aarch64-pc-windows-msvc.exe",
-        "claude-sidecar.exe",
+        "opencode-haha-sidecar-x86_64-pc-windows-msvc.exe",
+        "opencode-haha-sidecar-aarch64-pc-windows-msvc.exe",
+        "opencode-haha-sidecar.exe",
     ] {
         let _ = StdCommand::new("taskkill")
             .args(["/F", "/T", "/IM", image_name])
@@ -2642,12 +2642,12 @@ pub fn run() {
     let builder = builder
         .menu(|app| {
             let about_item =
-                MenuItemBuilder::with_id("nav_about", "关于 Claude Code Haha").build(app)?;
+                MenuItemBuilder::with_id("nav_about", "关于 opencode-haha").build(app)?;
             let settings_item = MenuItemBuilder::with_id("nav_settings", "设置...")
                 .accelerator("CmdOrCtrl+,")
                 .build(app)?;
 
-            let app_submenu = SubmenuBuilder::new(app, "Claude Code Haha")
+            let app_submenu = SubmenuBuilder::new(app, "opencode-haha")
                 .item(&about_item)
                 .separator()
                 .item(&settings_item)

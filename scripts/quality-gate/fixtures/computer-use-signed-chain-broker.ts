@@ -1,7 +1,7 @@
 // Test-only launch shell. The worker branch enters the real merged desktop
 // sidecar; native calls use the production binder, executor and daemon client.
 if (process.argv[2] === '--computer-use-repl-worker') {
-  await import('../../../desktop/sidecars/claude-sidecar.ts')
+  await import('../../../desktop/sidecars/opencode-haha-sidecar.ts')
 } else {
   const { bindSessionContext } = await import('../../../src/vendor/computer-use-mcp/mcpServer.ts')
   const { createCliExecutor } = await import('../../../src/utils/computerUse/executor.ts')

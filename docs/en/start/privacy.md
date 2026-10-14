@@ -32,7 +32,7 @@ The project maintainers do not sell user data or place advertising based on pers
 
 ## Removing data
 
-Uninstalling the application does not automatically delete sessions and configuration under `~/.claude`. To remove local data completely, first back up anything you want to keep, then manually delete `~/.claude` and the cc-haha data in your operating system's application-data directory (installed versions may still use the legacy directory name `Claude Code Haha`). To remove data already sent to a third-party service, follow that provider's process.
+Uninstalling the application does not automatically delete sessions and configuration under `~/.claude`. To remove local data completely, first back up anything you want to keep, then manually delete `~/.claude` and the cc-haha data in your operating system's application-data directory (installed versions may still use the legacy directory name `opencode-haha`). To remove data already sent to a third-party service, follow that provider's process.
 
 ## Contact
 

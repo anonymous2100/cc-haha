@@ -1218,7 +1218,7 @@ export const kr: Record<TranslationKey, string> = {
 
   // Settings > Terminal
   'settings.terminal.title': '터미널',
-  'settings.terminal.description': '플러그인, 스킬, MCP 설정을 위해 호스트 컴퓨터의 명령을 실행합니다. 데스크톱 앱에는 claude-haha가 포함되어 있습니다. 문서의 claude <args>를 claude-haha <args>로 바꾸세요. 예: claude-haha plugin install ... 또는 claude-haha mcp add ...',
+  'settings.terminal.description': '플러그인, 스킬, MCP 설정을 위해 호스트 컴퓨터의 명령을 실행합니다. 데스크톱 앱에는 opencode-haha가 포함되어 있습니다. 문서의 claude <args>를 opencode-haha <args>로 바꾸세요. 예: opencode-haha plugin install ... 또는 opencode-haha mcp add ...',
   'settings.terminal.infoLabel': '터미널 설정 도움말',
   'settings.terminal.clear': '지우기',
   'settings.terminal.restart': '다시 시작',
@@ -2453,7 +2453,7 @@ export const kr: Record<TranslationKey, string> = {
   'settings.general.notificationsStatusUnsupported': '이 환경에서는 사용할 수 없습니다',
   'settings.general.notificationsAuthorize': '허용',
   'settings.general.notificationsOpenSettings': '설정 열기',
-  'settings.general.notificationsTestTitle': 'Claude Code Haha 알림이 사용 설정되었습니다',
+  'settings.general.notificationsTestTitle': 'opencode-haha 알림이 사용 설정되었습니다',
   'settings.general.notificationsTestBody': '이제 권한 확인과 완료된 에이전트 응답에 시스템 알림이 사용됩니다.',
   'settings.general.traceTitle': 'Agent Trace',
   'settings.general.traceDescription': '멈춤, 실패, 예상치 못한 대기를 조사하기 위해 로컬 세션의 모델 요청 트레이스를 수집합니다.',

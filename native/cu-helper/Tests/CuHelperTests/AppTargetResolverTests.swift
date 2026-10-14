@@ -29,21 +29,21 @@ final class AppTargetResolverTests: XCTestCase {
     func testFullPathSelectsOnlyThatBundleWhenRunningCopiesShareAName() throws {
         let installed = AppTargetCandidate(
             pid: 100,
-            bundleIdentifier: "com.claude-code-haha.desktop",
-            bundleURL: URL(fileURLWithPath: "/Applications/Claude Code Haha.app"),
-            localizedName: "Claude Code Haha",
-            executableName: "Claude Code Haha"
+            bundleIdentifier: "com.opencode-haha.desktop",
+            bundleURL: URL(fileURLWithPath: "/Applications/opencode-haha.app"),
+            localizedName: "opencode-haha",
+            executableName: "opencode-haha"
         )
         let worktree = AppTargetCandidate(
             pid: 200,
-            bundleIdentifier: "com.claude-code-haha.desktop",
-            bundleURL: URL(fileURLWithPath: "/Users/test/worktree/desktop/build-artifacts/macos-arm64/Claude Code Haha.app"),
-            localizedName: "Claude Code Haha",
-            executableName: "Claude Code Haha"
+            bundleIdentifier: "com.opencode-haha.desktop",
+            bundleURL: URL(fileURLWithPath: "/Users/test/worktree/desktop/build-artifacts/macos-arm64/opencode-haha.app"),
+            localizedName: "opencode-haha",
+            executableName: "opencode-haha"
         )
 
         let result = try AppTargetResolver.match(
-            identifier: "/Users/test/worktree/desktop/build-artifacts/macos-arm64/Claude Code Haha.app",
+            identifier: "/Users/test/worktree/desktop/build-artifacts/macos-arm64/opencode-haha.app",
             candidates: [installed, worktree]
         )
 
@@ -51,7 +51,7 @@ final class AppTargetResolverTests: XCTestCase {
         XCTAssertEqual(result.bundleURL, worktree.bundleURL)
         XCTAssertThrowsError(
             try AppTargetResolver.match(
-                identifier: "Claude Code Haha",
+                identifier: "opencode-haha",
                 candidates: [installed, worktree]
             )
         ) {
@@ -60,20 +60,20 @@ final class AppTargetResolverTests: XCTestCase {
     }
 
     func testFullPathCollapsesHelperProcessesIntoTheirMainBundleInstance() throws {
-        let path = "/Users/test/worktree/desktop/build-artifacts/macos-arm64/Claude Code Haha.app"
+        let path = "/Users/test/worktree/desktop/build-artifacts/macos-arm64/opencode-haha.app"
         let main = AppTargetCandidate(
             pid: 200,
-            bundleIdentifier: "com.claude-code-haha.desktop",
+            bundleIdentifier: "com.opencode-haha.desktop",
             bundleURL: URL(fileURLWithPath: path),
-            localizedName: "Claude Code Haha",
-            executableName: "Claude Code Haha"
+            localizedName: "opencode-haha",
+            executableName: "opencode-haha"
         )
         let renderer = AppTargetCandidate(
             pid: 201,
             bundleIdentifier: main.bundleIdentifier,
             bundleURL: main.bundleURL,
-            localizedName: "Claude Code Haha Helper (Renderer)",
-            executableName: "Claude Code Haha Helper (Renderer)"
+            localizedName: "opencode-haha Helper (Renderer)",
+            executableName: "opencode-haha Helper (Renderer)"
         )
 
         let result = try AppTargetResolver.match(

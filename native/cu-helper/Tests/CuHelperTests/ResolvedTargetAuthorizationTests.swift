@@ -90,7 +90,7 @@ final class ResolvedTargetAuthorizationTests: XCTestCase {
             "com.spotify.client",
             "com.apple.Music",
             "com.amazon.Kindle",
-            "com.claude-code-haha.desktop",
+            "com.opencode-haha.desktop",
             "dev.cchaha.cu-helper",
             "com.example.custom-host",
             "com.example.new-app",
@@ -141,15 +141,15 @@ final class ResolvedTargetAuthorizationTests: XCTestCase {
     func testWorktreeHostPathResolutionAuthorizesExactProcess() throws {
         let installed = AppTargetCandidate(
             pid: 100,
-            bundleIdentifier: "com.claude-code-haha.desktop",
-            bundleURL: URL(fileURLWithPath: "/Applications/Claude Code Haha.app"),
-            localizedName: "Claude Code Haha",
-            executableName: "Claude Code Haha"
+            bundleIdentifier: "com.opencode-haha.desktop",
+            bundleURL: URL(fileURLWithPath: "/Applications/opencode-haha.app"),
+            localizedName: "opencode-haha",
+            executableName: "opencode-haha"
         )
         let worktree = AppTargetCandidate(
             pid: 200,
             bundleIdentifier: installed.bundleIdentifier,
-            bundleURL: URL(fileURLWithPath: "/Users/test/worktree/desktop/build-artifacts/macos-arm64/Claude Code Haha.app"),
+            bundleURL: URL(fileURLWithPath: "/Users/test/worktree/desktop/build-artifacts/macos-arm64/opencode-haha.app"),
             localizedName: installed.localizedName,
             executableName: installed.executableName
         )
@@ -159,7 +159,7 @@ final class ResolvedTargetAuthorizationTests: XCTestCase {
         )
         let identity = AXTreeProcessIdentity(
             bundleID: worktree.bundleIdentifier,
-            executablePath: worktree.bundleURL!.appendingPathComponent("Contents/MacOS/Claude Code Haha").path,
+            executablePath: worktree.bundleURL!.appendingPathComponent("Contents/MacOS/opencode-haha").path,
             launchTime: 300
         )
 

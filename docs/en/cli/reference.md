@@ -7,10 +7,10 @@ order: 1
 
 # Command Reference
 
-cc-haha starts an interactive session by default. With `--print`, it can also run as a non-interactive agent in scripts, CI, or another program. The command in a source checkout is `./bin/claude-haha`; the installed executable name depends on the installation method.
+cc-haha starts an interactive session by default. With `--print`, it can also run as a non-interactive agent in scripts, CI, or another program. The command in a source checkout is `./bin/opencode-haha`; the installed executable name depends on the installation method.
 
 ```bash
-./bin/claude-haha --help
+./bin/opencode-haha --help
 ```
 
 `--help` is the source of truth for the installed version. This page explains common options by task instead of duplicating a complete help listing that would quickly become stale.
@@ -19,25 +19,25 @@ cc-haha starts an interactive session by default. With `--print`, it can also ru
 
 ```bash
 # Start an interactive session in the current directory
-./bin/claude-haha
+./bin/opencode-haha
 
 # Start with an initial request
-./bin/claude-haha "Explain how this repository starts"
+./bin/opencode-haha "Explain how this repository starts"
 
 # Return text and exit
-./bin/claude-haha --print "Summarize the latest commit"
+./bin/opencode-haha --print "Summarize the latest commit"
 
 # Return one complete JSON result
-./bin/claude-haha --print --output-format json "List the main modules"
+./bin/opencode-haha --print --output-format json "List the main modules"
 
 # Continue the latest session in this directory
-./bin/claude-haha --continue
+./bin/opencode-haha --continue
 
 # Resume a session but fork it to a new session ID
-./bin/claude-haha --resume <session-id> --fork-session
+./bin/opencode-haha --resume <session-id> --fork-session
 
 # Work in a new Git worktree
-./bin/claude-haha --worktree docs-refresh
+./bin/opencode-haha --worktree docs-refresh
 ```
 
 ## Understand the `--print` trust boundary first
@@ -72,7 +72,7 @@ Consequently:
 Structured output example:
 
 ```bash
-./bin/claude-haha --print \
+./bin/opencode-haha --print \
   --output-format json \
   --json-schema '{"type":"object","properties":{"risk":{"type":"string"}},"required":["risk"]}' \
   "Review the current changes and return only the risk level"
@@ -158,8 +158,8 @@ Deny rules and platform policy can still override allow rules. Production automa
 Each subcommand has separate help:
 
 ```bash
-./bin/claude-haha mcp --help
-./bin/claude-haha plugin --help
+./bin/opencode-haha mcp --help
+./bin/opencode-haha plugin --help
 ```
 
 ## Interactive commands

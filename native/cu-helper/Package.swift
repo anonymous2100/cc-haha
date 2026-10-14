@@ -1,7 +1,7 @@
 // swift-tools-version: 6.0
 //
 // SwiftPM manifest for `cu-helper` — the native macOS Computer Use helper for
-// claude-code-haha.
+// opencode-haha.
 //
 // One dual-mode executable target:
 //   • `cu-helper <command> --payload '<json>'`  — one-shot CLI used by the

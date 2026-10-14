@@ -48,7 +48,7 @@ import { resolveCuHelperAppBundle } from './cuHelperBridge.js'
 const APP_NAME = 'cc-haha-computer-use.app'
 const INNER_REL = path.join('Contents', 'MacOS', 'cc-haha-computer-use')
 const HELPER_IDENTIFIER = 'dev.cchaha.cu-helper'
-const SIDECAR_IDENTIFIER = 'com.claude-code-haha.desktop.sidecar'
+const SIDECAR_IDENTIFIER = 'com.opencode-haha.desktop.sidecar'
 const SIGNED_FINGERPRINT_FILES = [
   INNER_REL,
   path.join('Contents', 'Info.plist'),

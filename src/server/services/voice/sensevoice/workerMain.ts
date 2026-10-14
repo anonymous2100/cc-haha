@@ -1,4 +1,4 @@
-/** Development entry for the SenseVoice worker; packaged builds use `claude-sidecar --voice-worker`. */
+/** Development entry for the SenseVoice worker; packaged builds use `opencode-haha-sidecar --voice-worker`. */
 import { runVoiceWorker } from './worker.js'
 
 try {

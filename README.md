@@ -96,7 +96,7 @@ cc-haha 是一个**桌面端 Claude Code 工作台**：多会话与全局搜索�
 ```bash
 bun install
 cp .env.example .env
-./bin/claude-haha
+./bin/opencode-haha
 ```
 
 更多配置见 [环境变量](docs/cli/env.md) 和 [命令行安装与启动](docs/cli/index.md)。

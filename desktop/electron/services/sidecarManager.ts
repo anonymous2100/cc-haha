@@ -78,7 +78,7 @@ export function resolveHostTriple(platform = process.platform, arch = process.ar
 }
 
 export function resolveSidecarExecutable(desktopRoot: string, triple = resolveHostTriple()): string {
-  const base = path.join(desktopRoot, 'src-tauri', 'binaries', `claude-sidecar-${triple}`)
+  const base = path.join(desktopRoot, 'src-tauri', 'binaries', `opencode-haha-sidecar-${triple}`)
   return process.platform === 'win32' ? `${base}.exe` : base
 }
 
@@ -664,7 +664,7 @@ export function createServerPlan({
   }
 }
 
-/** IM adapters the sidecar can start; mirrors `ADAPTERS` in claude-sidecar.ts. */
+/** IM adapters the sidecar can start; mirrors `ADAPTERS` in opencode-haha-sidecar.ts. */
 export const ADAPTER_FLAGS = [
   '--feishu',
   '--telegram',

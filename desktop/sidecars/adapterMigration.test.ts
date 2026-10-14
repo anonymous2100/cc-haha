@@ -11,7 +11,7 @@ it('the real adapter launcher confirms inactivity when migration races credentia
   const data = path.join(root, 'data')
   await mkdir(data)
   const repo = path.resolve(import.meta.dirname, '../..')
-  const child = spawn('bun', [path.join(repo, 'desktop/sidecars/claude-sidecar.ts'), 'adapters', '--app-root', repo, '--feishu', '--telegram', '--wechat', '--dingtalk', '--whatsapp', '--wecom', '--qq', '--slack'], {
+  const child = spawn('bun', [path.join(repo, 'desktop/sidecars/opencode-haha-sidecar.ts'), 'adapters', '--app-root', repo, '--feishu', '--telegram', '--wechat', '--dingtalk', '--whatsapp', '--wecom', '--qq', '--slack'], {
     env: {
       PATH: process.env.PATH,
       SystemRoot: process.env.SystemRoot,

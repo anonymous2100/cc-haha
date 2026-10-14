@@ -15,7 +15,7 @@ That's a real session. Projects and history on the left, the conversation in the
 
 ## How this relates to the Claude Code CLI
 
-Claude Code is Anthropic's command-line coding agent. The engine inside cc-haha is a CLI built from repaired Claude Code sources (it's called `claude-haha` in this repo), and the desktop app is the graphical shell wrapped around it.
+Claude Code is Anthropic's command-line coding agent. The engine inside cc-haha is a CLI built from repaired Claude Code sources (it's called `opencode-haha` in this repo), and the desktop app is the graphical shell wrapped around it.
 
 Two practical consequences:
 

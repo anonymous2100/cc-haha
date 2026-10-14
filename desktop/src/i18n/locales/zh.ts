@@ -1214,7 +1214,7 @@ export const zh: Record<TranslationKey, string> = {
 
   // Settings > Terminal
   'settings.terminal.title': '终端',
-  'settings.terminal.description': '直接运行宿主机命令，用于安装插件、Skills、MCP 等扩展。桌面端已内置 claude-haha；文档里的 claude <参数> 可替换成 claude-haha <参数>，例如 claude-haha plugin install ... 或 claude-haha mcp add ...',
+  'settings.terminal.description': '直接运行宿主机命令，用于安装插件、Skills、MCP 等扩展。桌面端已内置 opencode-haha；文档里的 claude <参数> 可替换成 opencode-haha <参数>，例如 opencode-haha plugin install ... 或 opencode-haha mcp add ...',
   'settings.terminal.infoLabel': '终端安装说明',
   'settings.terminal.clear': '清屏',
   'settings.terminal.restart': '重启',
@@ -2449,7 +2449,7 @@ export const zh: Record<TranslationKey, string> = {
   'settings.general.notificationsStatusUnsupported': '当前环境不可用',
   'settings.general.notificationsAuthorize': '授权通知',
   'settings.general.notificationsOpenSettings': '打开系统设置',
-  'settings.general.notificationsTestTitle': 'Claude Code Haha 通知已启用',
+  'settings.general.notificationsTestTitle': 'opencode-haha 通知已启用',
   'settings.general.notificationsTestBody': '后续授权确认和 Agent 回复完成都会通过系统通知提醒。',
   'settings.general.traceTitle': 'Agent Trace',
   'settings.general.traceDescription': '收集本地会话的模型请求链路，用于排查卡住、失败和异常等待。',

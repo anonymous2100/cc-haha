@@ -1,4 +1,3 @@
-import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 export type ClaudeCliLauncher = {
@@ -12,16 +11,8 @@ export function resolveBundledCliPathFromExecPath(
 ): string | null {
   const execName = path.basename(execPath)
 
-  if (execName.startsWith('claude-sidecar')) {
+  if (execName.startsWith('opencode-haha-sidecar')) {
     return execPath
-  }
-
-  if (execName.startsWith('claude-server')) {
-    const bundledCliPath = path.join(
-      path.dirname(execPath),
-      execName.replace(/^claude-server/, 'claude-cli'),
-    )
-    return fs.existsSync(bundledCliPath) ? bundledCliPath : null
   }
 
   return null
@@ -47,18 +38,10 @@ export function resolveClaudeCliLauncher(options?: {
   }
 
   const cliBaseName = path.basename(command)
-  if (cliBaseName.startsWith('claude-sidecar')) {
+  if (cliBaseName.startsWith('opencode-haha-sidecar')) {
     return {
       command,
       kind: 'sidecar',
-      requiresAppRoot: true,
-    }
-  }
-
-  if (cliBaseName.startsWith('claude-cli')) {
-    return {
-      command,
-      kind: 'binary',
       requiresAppRoot: true,
     }
   }

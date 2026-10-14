@@ -481,7 +481,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "claude-code-desktop"
+name = "opencode-haha-desktop"
 version = "0.3.2"
 dependencies = [
  "anyhow",

@@ -35,7 +35,7 @@ fn main() {
         std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &webview_data);
     }
 
-    claude_code_desktop_lib::run()
+    opencode_haha_desktop_lib::run()
 }
 
 /// Determine if we should start in portable mode.
@@ -99,7 +99,7 @@ fn determine_startup_portable_dir() -> Option<PathBuf> {
 
     if let Some(ref sys_cfg) = system_config {
         // 修复：必须使用 Tauri 默认的 bundle identifier
-        let app_subdir = sys_cfg.join("com.claude-code-haha.desktop");
+        let app_subdir = sys_cfg.join("com.opencode-haha.desktop");
         if let Some((mode, portable_dir)) = get_mode_from_config(&app_subdir) {
             if mode == "portable" {
                 return Some(portable_dir.unwrap_or(default_portable.clone()));

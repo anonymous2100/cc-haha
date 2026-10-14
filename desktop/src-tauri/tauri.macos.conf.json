@@ -2,7 +2,7 @@
   "app": {
     "windows": [
       {
-        "title": "Claude Code Haha",
+        "title": "opencode-haha",
         "width": 1440,
         "height": 960,
         "minWidth": 960,

@@ -21,7 +21,7 @@ function readBuildScript() {
 
 function readCliLauncher() {
   return readFileSync(
-    path.resolve(import.meta.dirname, '../../bin/claude-haha'),
+    path.resolve(import.meta.dirname, '../../bin/opencode-haha'),
     'utf8',
   )
 }
@@ -739,7 +739,7 @@ describe.skipIf(!compiledSidecarSmokeEnabled || process.platform !== 'darwin')('
 
 /**
  * The adapters mode is the one launcher path no unit test can reach: nothing
- * imports `claude-sidecar.ts`, and its module body runs `runAdapters` before
+ * imports `opencode-haha-sidecar.ts`, and its module body runs `runAdapters` before
  * the rest of the file is evaluated. A `const` declared below that call sits in
  * its temporal dead zone, which crashed every adapter sidecar in the packaged
  * app while every other check stayed green — so this exercises the real binary.

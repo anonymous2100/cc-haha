@@ -17,7 +17,7 @@ order: 4
 
 **为什么** — 文件没坏。macOS 会给从网上下载的包打一个隔离标记，遇到没有 Apple 签名的应用就拒绝启动，而报错文案写成了「已损坏」，非常有误导性。
 
-**怎么办** — 从同一个 Release 下载 `install-macos-unsigned.sh`，放到和 DMG 同一个文件夹，执行 `bash install-macos-unsigned.sh`；或者应用已经在「应用程序」里的话，直接执行 `xattr -dr com.apple.quarantine "/Applications/Claude Code Haha.app"`。完整说明见 [下载与安装](./install.md)。
+**怎么办** — 从同一个 Release 下载 `install-macos-unsigned.sh`，放到和 DMG 同一个文件夹，执行 `bash install-macos-unsigned.sh`；或者应用已经在「应用程序」里的话，直接执行 `xattr -dr com.apple.quarantine "/Applications/opencode-haha.app"`。完整说明见 [下载与安装](./install.md)。
 
 ### Windows 弹出 SmartScreen 蓝屏
 
@@ -33,7 +33,7 @@ order: 4
 
 1. 退出主窗口，检查系统托盘里的图标也一并退出。
 2. 等几秒让后台进程结束。
-3. 还不行就去任务管理器里找 cc-haha 相关进程手动结束；已安装版本的进程可能仍显示旧名称 `Claude Code Haha`。
+3. 还不行就去任务管理器里找 cc-haha 相关进程手动结束；已安装版本的进程可能仍显示旧名称 `opencode-haha`。
 4. 重新双击安装器。**不要**选「以管理员身份运行」，也**不要**先手动删掉旧安装目录里的数据。
 
 ### Linux AppImage 双击没反应

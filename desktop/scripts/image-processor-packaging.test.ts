@@ -32,7 +32,7 @@ it.each([false, true])('creates and resizes packaged images from a user project 
   try {
     const appDirectory = path.join(root, 'app')
     const resources = path.join(root, '中文 安装目录', 'resources')
-    const binaryName = process.platform === 'win32' ? 'claude-sidecar.exe' : 'claude-sidecar'
+    const binaryName = process.platform === 'win32' ? 'opencode-haha-sidecar.exe' : 'opencode-haha-sidecar'
     const relativeBinary = path.join('src-tauri', 'binaries', binaryName)
     const buildBinary = path.join(appDirectory, relativeBinary)
     const project = path.join(root, '中文 用户项目')

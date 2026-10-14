@@ -12,7 +12,7 @@ order: 3
 ```text
 .
 ├── bin/
-│   └── claude-haha                 # CLI 启动脚本
+│   └── opencode-haha                 # CLI 启动脚本
 ├── preload.ts                      # Bun preload 与构建期兼容入口
 ├── package.json                    # 根项目脚本和依赖
 ├── src/
@@ -53,7 +53,7 @@ order: 3
 │   │   ├── ipc/                    # IPC channel 与校验
 │   │   └── services/               # Sidecar、终端、更新、预览等服务
 │   ├── sidecars/
-│   │   └── claude-sidecar.ts       # server / cli / adapters 统一入口
+│   │   └── opencode-haha-sidecar.ts       # server / cli / adapters 统一入口
 │   ├── scripts/                    # 构建、打包和资源准备
 │   └── src-tauri/                  # 历史代码及现用打包资源；非当前 Host
 ├── adapters/
@@ -82,7 +82,7 @@ order: 3
 | `src/server/index.ts` | Bun / `Bun.serve` | 本地 HTTP、WebSocket 与 H5 |
 | `desktop/electron/main.ts` | Electron main | 原生桌面 Host |
 | `desktop/src/` | Chromium Renderer | React 桌面 UI |
-| `desktop/sidecars/claude-sidecar.ts` | Bun 编译 Sidecar | 打包后的 Server、CLI 与 Adapter 入口 |
+| `desktop/sidecars/opencode-haha-sidecar.ts` | Bun 编译 Sidecar | 打包后的 Server、CLI 与 Adapter 入口 |
 | `adapters/<platform>/` | Bun Sidecar | 平台消息接入 |
 
 新增代码时应放在拥有该职责的边界内：桌面原生能力进入 `desktop/electron/`，共享业务 API 进入 `src/server/`，IM 平台差异进入 `adapters/<platform>/`，不要在 Renderer 中绕过这些边界。

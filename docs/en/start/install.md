@@ -9,7 +9,7 @@ order: 1
 
 Install and go. You don't need Node.js, Python, or Claude Code — the CLI engine and the ripgrep binary used for file search are both bundled inside the installer.
 
-The product is now called **cc-haha**. Existing packages, installed apps, and system processes may still use the legacy name `Claude Code Haha`; filenames and commands below match those published packages.
+The product is now called **cc-haha**. Existing packages, installed apps, and system processes may still use the legacy name `opencode-haha`; filenames and commands below match those published packages.
 
 ## Pick the right package
 
@@ -17,12 +17,12 @@ Everything lives on [GitHub Releases](https://github.com/NanmiCoder/cc-haha/rele
 
 | Your system | Download |
 |---|---|
-| macOS, Apple Silicon | `Claude-Code-Haha-<version>-mac-arm64.dmg` |
-| macOS, Intel | `Claude-Code-Haha-<version>-mac-x64.dmg` |
-| Windows x64 | `Claude-Code-Haha-<version>-win-x64.exe` |
-| Windows ARM64 | `Claude-Code-Haha-<version>-win-arm64.exe` |
-| Linux x64 | `Claude-Code-Haha-<version>-linux-x86_64.AppImage` or `-linux-amd64.deb` |
-| Linux ARM64 | `Claude-Code-Haha-<version>-linux-arm64.AppImage` or `-linux-arm64.deb` |
+| macOS, Apple Silicon | `opencode-haha-<version>-mac-arm64.dmg` |
+| macOS, Intel | `opencode-haha-<version>-mac-x64.dmg` |
+| Windows x64 | `opencode-haha-<version>-win-x64.exe` |
+| Windows ARM64 | `opencode-haha-<version>-win-arm64.exe` |
+| Linux x64 | `opencode-haha-<version>-linux-x86_64.AppImage` or `-linux-amd64.deb` |
+| Linux ARM64 | `opencode-haha-<version>-linux-arm64.AppImage` or `-linux-arm64.deb` |
 
 Not sure which architecture you have? On macOS check the chip listed in "About This Mac"; on Windows check the system type under Settings → System → About. Don't guess from the brand of the machine.
 
@@ -54,7 +54,7 @@ The script picks the DMG matching your architecture, mounts it, installs the app
 If the app is already in Applications:
 
 ```bash
-xattr -dr com.apple.quarantine "/Applications/Claude Code Haha.app"
+xattr -dr com.apple.quarantine "/Applications/opencode-haha.app"
 ```
 
 Only do this for packages you have confirmed came from this repository's Releases. Never bypass Gatekeeper for software of unknown origin.
@@ -74,8 +74,8 @@ When upgrading in place, the installer inspects user data in the old install dir
 **AppImage** (no installation, just run it):
 
 ```bash
-chmod +x Claude-Code-Haha-<version>-linux-x86_64.AppImage
-./Claude-Code-Haha-<version>-linux-x86_64.AppImage
+chmod +x opencode-haha-<version>-linux-x86_64.AppImage
+./opencode-haha-<version>-linux-x86_64.AppImage
 ```
 
 If it fails with a FUSE-related error, install the runtime: `sudo apt install libfuse2` on Ubuntu 22.04 and earlier, `libfuse2t64` on 24.04 and later.
@@ -83,7 +83,7 @@ If it fails with a FUSE-related error, install the runtime: `sudo apt install li
 **deb** (installs into your application menu):
 
 ```bash
-sudo apt install ./Claude-Code-Haha-<version>-linux-amd64.deb
+sudo apt install ./opencode-haha-<version>-linux-amd64.deb
 ```
 
 On ARM64 machines, use the corresponding `linux-arm64` file.
@@ -97,7 +97,7 @@ git clone https://github.com/NanmiCoder/cc-haha.git
 cd cc-haha
 bun install
 cp .env.example .env
-./bin/claude-haha
+./bin/opencode-haha
 ```
 
 Requires [Bun](https://bun.sh) and Git. This runs the CLI only; for building the desktop app and configuring the local server, see [Command line](../cli/index.md).

@@ -10,7 +10,7 @@ describe('fuzzyScore', () => {
 
   it('matches subsequences case-insensitively', () => {
     expect(fuzzyScore('mcr', 'MediaCrawler')).toBeGreaterThan(0)
-    expect(fuzzyScore('CCH', 'claude-code-haha')).toBeGreaterThan(0)
+    expect(fuzzyScore('CCH', 'cc-haha')).toBeGreaterThan(0)
   })
 
   it('returns -1 when the query is not a subsequence', () => {
@@ -42,7 +42,7 @@ describe('fuzzyScore', () => {
 describe('fuzzyFilter', () => {
   const projects = [
     { label: 'NanmiCoder/MediaCrawler', path: '/Users/nanmi/workspace/myself_code/MediaCrawler' },
-    { label: 'cc-haha', path: '/Users/nanmi/workspace/myself_code/claude-code-haha' },
+    { label: 'cc-haha', path: '/Users/nanmi/workspace/myself_code/opencode-haha' },
     { label: '399-Union-Alpha-新模型', path: '/Users/nanmi/个人自媒体/399-Union-Alpha-新模型' },
   ]
   const keys = (p: (typeof projects)[number]) => [p.label, p.path]

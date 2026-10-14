@@ -17,7 +17,7 @@ First, one check: make sure you're on the latest stable build from [GitHub Relea
 
 **Why** — The file isn't damaged. macOS quarantines downloads and refuses to launch anything without an Apple signature, but words the error as "damaged", which sends everyone down the wrong path.
 
-**What to do** — Download `install-macos-unsigned.sh` from the same Release, put it in the same folder as the DMG, and run `bash install-macos-unsigned.sh`. Or, if the app is already in Applications, run `xattr -dr com.apple.quarantine "/Applications/Claude Code Haha.app"`. Full details in [Download and install](./install.md).
+**What to do** — Download `install-macos-unsigned.sh` from the same Release, put it in the same folder as the DMG, and run `bash install-macos-unsigned.sh`. Or, if the app is already in Applications, run `xattr -dr com.apple.quarantine "/Applications/opencode-haha.app"`. Full details in [Download and install](./install.md).
 
 ### Windows shows a SmartScreen warning
 
@@ -33,7 +33,7 @@ First, one check: make sure you're on the latest stable build from [GitHub Relea
 
 1. Quit the main window, and quit the tray icon too.
 2. Give background processes a few seconds to exit.
-3. Still stuck? End any remaining cc-haha processes in Task Manager; installed versions may still show the legacy name `Claude Code Haha`.
+3. Still stuck? End any remaining cc-haha processes in Task Manager; installed versions may still show the legacy name `opencode-haha`.
 4. Run the installer again. **Don't** use "Run as administrator", and **don't** manually delete data from the old install directory.
 
 ### The Linux AppImage does nothing when I run it

@@ -232,9 +232,9 @@ export async function runSignedComputerUseChain(options: SignedChainOptions = {}
     await mkdir(macos, { recursive: true })
     await mkdir(binaries, { recursive: true })
     const host = path.join(macos, 'FixtureHost')
-    await writeFile(path.join(hostApp, 'Contents/Info.plist'), `<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleExecutable</key><string>FixtureHost</string><key>CFBundleIdentifier</key><string>com.claude-code-haha.desktop</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>`)
+    await writeFile(path.join(hostApp, 'Contents/Info.plist'), `<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleExecutable</key><string>FixtureHost</string><key>CFBundleIdentifier</key><string>com.opencode-haha.desktop</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>`)
     await run('/usr/bin/clang', [path.join(repoRoot, 'scripts/quality-gate/fixtures/computer-use-signed-chain-host.c'), '-o', host])
-    const executable = path.join(binaries, `claude-sidecar-${process.arch === 'arm64' ? 'aarch64' : 'x86_64'}-apple-darwin`)
+    const executable = path.join(binaries, `opencode-haha-sidecar-${process.arch === 'arm64' ? 'aarch64' : 'x86_64'}-apple-darwin`)
     const build = await Bun.build({
       entrypoints: [path.join(repoRoot, 'scripts/quality-gate/fixtures/computer-use-signed-chain-broker.ts')],
       features: ['TRANSCRIPT_CLASSIFIER'], target: 'bun',
@@ -251,7 +251,7 @@ export async function runSignedComputerUseChain(options: SignedChainOptions = {}
     if (!build.success) throw new Error(build.logs.join('\n'))
     const entitlements = path.join(directory, 'sidecar-entitlements.plist')
     await writeFile(entitlements, '<?xml version="1.0"?><plist version="1.0"><dict><key>com.apple.security.cs.allow-jit</key><true/><key>com.apple.security.cs.allow-unsigned-executable-memory</key><true/></dict></plist>')
-    await sign(executable, 'com.claude-code-haha.desktop.sidecar', entitlements)
+    await sign(executable, 'com.opencode-haha.desktop.sidecar', entitlements)
 
     // Build current production Swift sources, with the production embedded
     // Info.plist. Avoid build.sh's automatic user-keychain identity discovery.
@@ -275,7 +275,7 @@ export async function runSignedComputerUseChain(options: SignedChainOptions = {}
     await sign(helperApp, 'dev.cchaha.cu-helper')
     const nested = path.join(binaries, 'cc-haha-computer-use.app')
     await cp(helperApp, nested, { recursive: true })
-    await sign(hostApp, 'com.claude-code-haha.desktop')
+    await sign(hostApp, 'com.opencode-haha.desktop')
     const helperBinary = path.join(helperApp, 'Contents/MacOS/cc-haha-computer-use')
     if (signingPlan.requiresPackagedInstall) {
       env.CLAUDE_APP_ROOT = path.join(hostApp, 'Contents/Resources/app.asar')

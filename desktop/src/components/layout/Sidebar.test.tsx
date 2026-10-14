@@ -531,7 +531,7 @@ describe('Sidebar', () => {
     expect(screen.getByTestId('sidebar-title-region')).toHaveAttribute('data-desktop-drag-region')
   })
 
-  // The header used to render both "Claude Code Haha" and "cc-haha" and hide
+  // The header used to render both "opencode-haha" and "cc-haha" and hide
   // one with a container query, so the app answered to two names depending on
   // how far the sidebar had been dragged. Only the short one ships now — and
   // the long one must not linger in the DOM, since a display-hidden copy still

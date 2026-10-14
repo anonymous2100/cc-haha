@@ -1215,7 +1215,7 @@ Row 9, all 8 cells: continuing from straight down, turning left through lower-le
 
   // Settings > Terminal
   'settings.terminal.title': 'Terminal',
-  'settings.terminal.description': 'Run host-machine commands for plugin, skill, and MCP setup. The desktop app includes claude-haha; replace documented claude <args> with claude-haha <args>, for example: claude-haha plugin install ... or claude-haha mcp add ...',
+  'settings.terminal.description': 'Run host-machine commands for plugin, skill, and MCP setup. The desktop app includes opencode-haha; replace documented claude <args> with opencode-haha <args>, for example: opencode-haha plugin install ... or opencode-haha mcp add ...',
   'settings.terminal.infoLabel': 'Terminal setup help',
   'settings.terminal.clear': 'Clear',
   'settings.terminal.restart': 'Restart',
@@ -2450,7 +2450,7 @@ Row 9, all 8 cells: continuing from straight down, turning left through lower-le
   'settings.general.notificationsStatusUnsupported': 'Unavailable in this environment',
   'settings.general.notificationsAuthorize': 'Authorize',
   'settings.general.notificationsOpenSettings': 'Open Settings',
-  'settings.general.notificationsTestTitle': 'Claude Code Haha notifications are enabled',
+  'settings.general.notificationsTestTitle': 'opencode-haha notifications are enabled',
   'settings.general.notificationsTestBody': 'Permission prompts and completed agent replies will now use system notifications.',
   'settings.general.traceTitle': 'Agent trace',
   'settings.general.traceDescription': 'Collect local model request traces for stuck sessions, failed calls, and unexpected waits.',

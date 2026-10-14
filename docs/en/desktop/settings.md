@@ -75,7 +75,7 @@ Talk to Claude from WeChat, DingTalk, WhatsApp, Telegram, Feishu, WeCom, QQ, or 
 
 ## Terminal
 
-A real host shell embedded in the app, for installing plugins, skills, MCP servers, and anything else that needs a command line. The desktop app bundles `claude-haha`, so anywhere the docs say `claude <args>` you can run `claude-haha <args>`.
+A real host shell embedded in the app, for installing plugins, skills, MCP servers, and anything else that needs a command line. The desktop app bundles `opencode-haha`, so anywhere the docs say `claude <args>` you can run `opencode-haha <args>`.
 
 On Windows you can also choose the startup shell (system default, PowerShell 7, Windows PowerShell, Command Prompt, or a custom executable) and set a Bash path — used when a tool calls Unix commands like `grep` or `sed`, usually pointing at Git Bash.
 

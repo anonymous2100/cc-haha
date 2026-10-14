@@ -6,12 +6,12 @@ import Testing
 struct ClientAttestationTests {
     private let team = "TEAM123456"
     private let leaf = Data([0xCA, 0xFE])
-    private let appRoot = "/Applications/Claude Code Haha.app"
+    private let appRoot = "/Applications/opencode-haha.app"
 
     private var sidecarPath: String {
         appRoot
             + "/Contents/Resources/app.asar.unpacked/src-tauri/binaries/"
-            + "claude-sidecar-aarch64-apple-darwin"
+            + "opencode-haha-sidecar-aarch64-apple-darwin"
     }
 
     private func process(
@@ -38,7 +38,7 @@ struct ClientAttestationTests {
         process(
             pid: 900,
             parentPID: 1,
-            path: "/Users/test/Library/Application Support/Claude Code Haha/"
+            path: "/Users/test/Library/Application Support/opencode-haha/"
                 + "cc-haha-computer-use.app/Contents/MacOS/cc-haha-computer-use",
             identifier: HelperClientPolicy.helperIdentifier
         )
@@ -48,7 +48,7 @@ struct ClientAttestationTests {
         process(
             pid: 300,
             parentPID: 1,
-            path: appRoot + "/Contents/MacOS/Claude Code Haha",
+            path: appRoot + "/Contents/MacOS/opencode-haha",
             identifier: HelperClientPolicy.desktopIdentifier
         )
     }
@@ -116,7 +116,7 @@ struct ClientAttestationTests {
         )
 
         var spoofed = cli
-        spoofed.executablePath = appRoot + "/Contents/Resources/claude-sidecar-aarch64-apple-darwin"
+        spoofed.executablePath = appRoot + "/Contents/Resources/opencode-haha-sidecar-aarch64-apple-darwin"
         #expect(
             HelperClientPolicy.authorizeDaemon(
                 peer: spoofed,

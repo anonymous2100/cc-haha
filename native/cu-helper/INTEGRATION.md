@@ -1,6 +1,6 @@
 # `cu-helper` — Integration Guide
 
-A native Swift Computer Use helper for claude-code-haha. It replaces the
+A native Swift Computer Use helper for opencode-haha. It replaces the
 `runtime/mac_helper.py` (pyautogui + mss) bridge with a single, code-signed
 `arm64` executable that:
 
@@ -304,7 +304,7 @@ Add the signed binary as a Tauri sidecar alongside the existing one:
 
 ```jsonc
 "externalBin": [
-  "binaries/claude-sidecar",
+  "binaries/opencode-haha-sidecar",
   "binaries/cu-helper"          // <- added
 ]
 ```

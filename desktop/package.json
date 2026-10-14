@@ -1,18 +1,18 @@
 {
-  "name": "claude-code-desktop",
+  "name": "opencode-haha-desktop",
   "private": true,
   "version": "0.6.8",
-  "description": "Desktop coding agent workbench for Claude Code Haha.",
+  "description": "Desktop coding agent workbench for opencode-haha.",
   "homepage": "https://github.com/NanmiCoder/cc-haha",
   "author": {
-    "name": "NanmiCoder",
+    "name": "opencode-haha",
     "email": "relakkes@gmail.com"
   },
   "type": "module",
   "main": "electron-dist/main.cjs",
   "build": {
-    "appId": "com.claude-code-haha.desktop",
-    "productName": "Claude Code Haha",
+    "appId": "com.opencode-haha.desktop",
+    "productName": "opencode-haha",
     "asar": true,
     "asarUnpack": [
       "dist/**",
@@ -24,7 +24,7 @@
       "src-tauri/binaries/**",
       "node_modules/@ngrok/**"
     ],
-    "artifactName": "Claude-Code-Haha-${version}-${os}-${arch}.${ext}",
+    "artifactName": "opencode-haha-${version}-${os}-${arch}.${ext}",
     "npmRebuild": false,
     "directories": {
       "output": "build-artifacts/electron"
@@ -57,7 +57,7 @@
         "/Contents/Frameworks/.+\\.(?:pak|bin|dat|nib)$",
         "/Contents/Resources/.+\\.(?:asar|pak|bin|dat|icns|png|jpg|jpeg|gif|svg|ttf|woff|woff2)$",
         "cc-haha-computer-use\\.app",
-        "claude-sidecar-[^/]+$"
+        "opencode-haha-sidecar-[^/]+$"
       ],
       "notarize": true
     },
@@ -77,7 +77,7 @@
       ],
       "icon": "src-tauri/icons",
       "category": "Development",
-      "maintainer": "NanmiCoder <relakkes@gmail.com>"
+      "maintainer": "opencode-haha <relakkes@gmail.com>"
     },
     "publish": [
       {

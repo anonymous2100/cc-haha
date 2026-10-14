@@ -671,7 +671,7 @@ describe('Settings API', () => {
   it('GET /api/settings/cli-launcher should expose bundled launcher status', async () => {
     if (process.platform === 'win32') return
 
-    const sidecarPath = path.join(tmpDir, 'claude-sidecar')
+    const sidecarPath = path.join(tmpDir, 'opencode-haha-sidecar')
     await fs.writeFile(sidecarPath, '#!/bin/sh\necho desktop-sidecar\n', {
       encoding: 'utf8',
       mode: 0o755,
@@ -683,7 +683,7 @@ describe('Settings API', () => {
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.command).toBe('claude-haha')
+    expect(body.command).toBe('opencode-haha')
     expect(body.installed).toBe(true)
     expect(body.availableInNewTerminals).toBe(true)
   })

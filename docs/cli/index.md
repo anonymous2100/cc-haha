@@ -44,8 +44,8 @@ ANTHROPIC_MODEL=provider-model
 macOS、Linux 或 Git Bash：
 
 ```bash
-./bin/claude-haha
-./bin/claude-haha -p "概括当前项目的目录结构"
+./bin/opencode-haha
+./bin/opencode-haha -p "概括当前项目的目录结构"
 ```
 
 Windows PowerShell 或 cmd：
@@ -58,16 +58,16 @@ bun --env-file=.env ./src/entrypoints/cli.tsx
 
 ## 在任意目录启动
 
-`./bin/claude-haha` 只在仓库里能用。把它加进 `PATH`，就能在任何项目目录直接敲 `claude-haha`，CLI 会自动把当前工作目录当成项目根。
+`./bin/opencode-haha` 只在仓库里能用。把它加进 `PATH`，就能在任何项目目录直接敲 `opencode-haha`，CLI 会自动把当前工作目录当成项目根。
 
 macOS 和 Linux 在 `~/.bashrc` 或 `~/.zshrc` 中添加：
 
 ```bash
 # 方式一：加入 PATH（推荐）
-export PATH="$HOME/path/to/claude-code-haha/bin:$PATH"
+export PATH="$HOME/path/to/opencode-haha/bin:$PATH"
 
 # 方式二：alias
-alias claude-haha="$HOME/path/to/claude-code-haha/bin/claude-haha"
+alias opencode-haha="$HOME/path/to/opencode-haha/bin/opencode-haha"
 ```
 
 改完重新加载：
@@ -79,19 +79,19 @@ source ~/.zshrc  # 或 source ~/.bashrc
 Windows 的 Git Bash 同样在 `~/.bashrc` 中加 `PATH`：
 
 ```bash
-export PATH="$HOME/path/to/claude-code-haha/bin:$PATH"
+export PATH="$HOME/path/to/opencode-haha/bin:$PATH"
 ```
 
 验证方式是换个目录再启动，然后问它「当前目录是什么」：
 
 ```bash
 cd ~/your-other-project
-claude-haha
+opencode-haha
 ```
 
 ### Windows 配 WSL 工具链
 
-如果 `claude-haha` 跑在 Windows 或 Git Bash 里，而 Node、Python、uv、bun 这些工具装在 WSL 中，可以显式经 WSL 调用：
+如果 `opencode-haha` 跑在 Windows 或 Git Bash 里，而 Node、Python、uv、bun 这些工具装在 WSL 中，可以显式经 WSL 调用：
 
 ```bash
 wsl -e bash -lc 'node --version && python3 --version'

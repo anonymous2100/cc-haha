@@ -24,8 +24,8 @@ describe('Windows installer process matching', () => {
     expect(installerHook).toMatch(
       /fallback process filtering failed[\s\S]*StrCpy \$\{_RETURN\} 0/,
     )
-    expect(installerHook).toContain('claude-sidecar-x86_64-pc-windows-msvc.exe')
-    expect(installerHook).toContain('claude-sidecar-aarch64-pc-windows-msvc.exe')
+    expect(installerHook).toContain('opencode-haha-sidecar-x86_64-pc-windows-msvc.exe')
+    expect(installerHook).toContain('opencode-haha-sidecar-aarch64-pc-windows-msvc.exe')
     expect(installerHook).toContain('/C:"OpenConsole.exe"')
     expect(installerHook).toContain('/C:"winpty-agent.exe"')
     expect(installerHook).toContain('/C:"rg.exe"')
@@ -61,7 +61,7 @@ describe('Windows installer process matching', () => {
     )
 
     expect(installerSmoke).toContain("$siblingDir = \"$installDir Tools\"")
-    expect(installerSmoke).toContain("$siblingProbe = Join-Path $siblingDir 'Claude Code Haha.exe'")
+    expect(installerSmoke).toContain("$siblingProbe = Join-Path $siblingDir 'opencode-haha.exe'")
     expect(installerSmoke).toContain('Sibling-prefix process remains running')
     expect(installerSmoke).toContain('Install-directory parent process detection')
     expect(installerSmoke).toContain('Install-directory process was not terminated')

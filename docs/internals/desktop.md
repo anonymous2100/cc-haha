@@ -16,11 +16,11 @@ order: 1
 ```text
 Electron main
 ├── Chromium renderer（React UI）
-├── claude-sidecar server
+├── opencode-haha-sidecar server
 │   ├── Bun.serve HTTP API
 │   ├── Bun WebSocket 会话网关
 │   └── 按会话启动 CLI 子进程
-└── claude-sidecar adapters（按平台独立启动）
+└── opencode-haha-sidecar adapters（按平台独立启动）
     ├── Telegram
     ├── Feishu
     ├── WeChat
@@ -67,7 +67,7 @@ Renderer 不应直接导入 Electron，也不应自行拼接任意 IPC channel�
 ### 启动流程
 
 1. Electron 解析默认或便携存储模式，并准备应用配置目录。
-2. Host 选择可用端口，启动统一的 `claude-sidecar server` 二进制。
+2. Host 选择可用端口，启动统一的 `opencode-haha-sidecar server` 二进制。
 3. Sidecar 从 `src/server/index.ts` 进入 `startServer()`，使用 `Bun.serve` 同时承载 HTTP 和 WebSocket。
 4. 健康检查通过后，Renderer 获取 loopback Server URL 并加载会话与设置。
 5. Host 根据已配置的平台启动对应 Adapter Sidecar。
@@ -77,12 +77,12 @@ Server 可绑定局域网可访问地址以支持 H5，但桌面 Renderer 使用
 
 ### Sidecar 入口
 
-`desktop/sidecars/claude-sidecar.ts` 是统一入口：
+`desktop/sidecars/opencode-haha-sidecar.ts` 是统一入口：
 
 ```text
-claude-sidecar server   --app-root <path> --host <host> --port <port>
-claude-sidecar cli      --app-root <path> [CLI arguments]
-claude-sidecar adapters --app-root <path> --telegram|--feishu|--wechat|--dingtalk|--whatsapp|--wecom|--qq|--slack
+opencode-haha-sidecar server   --app-root <path> --host <host> --port <port>
+opencode-haha-sidecar cli      --app-root <path> [CLI arguments]
+opencode-haha-sidecar adapters --app-root <path> --telegram|--feishu|--wechat|--dingtalk|--whatsapp|--wecom|--qq|--slack
 ```
 
 Sidecar 在导入业务模块前设置 `CLAUDE_APP_ROOT`、`CALLER_DIR` 和启动参数，因为 Server、CLI 与 Adapter 的顶层模块会读取这些值。

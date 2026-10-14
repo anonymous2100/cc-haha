@@ -5,7 +5,7 @@
 ```json
 {
   "version": "0.6.7",
-  "product": "Claude Code Haha",
+  "product": "opencode-haha",
   "features": [
     {"title": "侧边对话", "body": "输入 /btw，在右侧开启独立的临时对话，不打断主任务。"}
   ],

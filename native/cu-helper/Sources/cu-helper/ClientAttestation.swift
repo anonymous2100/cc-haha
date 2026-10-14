@@ -22,8 +22,8 @@ enum HelperAuthorizationDecision: Equatable, Sendable {
 /// ancestry and command policy stay exhaustively unit-testable.
 enum HelperClientPolicy {
     static let helperIdentifier = "dev.cchaha.cu-helper"
-    static let desktopIdentifier = "com.claude-code-haha.desktop"
-    static let sidecarIdentifier = "com.claude-code-haha.desktop.sidecar"
+    static let desktopIdentifier = "com.opencode-haha.desktop"
+    static let sidecarIdentifier = "com.opencode-haha.desktop.sidecar"
 
     private static let daemonCommands: Set<String> = [
         // Codex semantic tool contract. `resolve_app_target` is the mandatory
@@ -209,8 +209,8 @@ enum HelperClientPolicy {
             + "/Contents/Resources/app.asar.unpacked/src-tauri/binaries/"
         guard path.hasPrefix(directory) else { return false }
         let name = String(path.dropFirst(directory.count))
-        return name == "claude-sidecar-aarch64-apple-darwin"
-            || name == "claude-sidecar-x86_64-apple-darwin"
+        return name == "opencode-haha-sidecar-aarch64-apple-darwin"
+            || name == "opencode-haha-sidecar-x86_64-apple-darwin"
     }
 }
 

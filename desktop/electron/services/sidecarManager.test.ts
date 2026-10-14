@@ -135,7 +135,7 @@ describe('Electron sidecar manager', () => {
       env: {},
     })
 
-    expect(plan.command).toContain(path.join(desktopRoot, 'src-tauri', 'binaries', 'claude-sidecar-'))
+    expect(plan.command).toContain(path.join(desktopRoot, 'src-tauri', 'binaries', 'opencode-haha-sidecar-'))
     expect(plan.args).toContain(appRoot)
     expect(plan.env.CLAUDE_H5_DIST_DIR).toBe(h5DistDir)
   })
@@ -607,7 +607,7 @@ describe('Electron sidecar manager', () => {
     const spawnFn = vi.fn(() => spawned)
     const existsSyncFn = vi.fn(() => true)
     const plan = {
-      command: '/app/desktop/src-tauri/binaries/claude-sidecar-x86_64-pc-windows-msvc.exe',
+      command: '/app/desktop/src-tauri/binaries/opencode-haha-sidecar-x86_64-pc-windows-msvc.exe',
       args: ['server', '--port', '49321'],
       env: { CLAUDE_H5_AUTO_PUBLIC_URL: '1' },
     }
@@ -805,7 +805,7 @@ describe('adapter flag parity across the launch path', () => {
     source.includes(`'${flag}'`) || source.includes(`"${flag}"`)
 
   it.each([
-    ['the sidecar launcher table', 'desktop/sidecars/claude-sidecar.ts'],
+    ['the sidecar launcher table', 'desktop/sidecars/opencode-haha-sidecar.ts'],
     ['the Tauri shell spawn list', 'desktop/src-tauri/src/lib.rs'],
     ['the Electron spawn loop', 'desktop/electron/services/serverRuntime.ts'],
   ])('lists every adapter flag in %s', (_label, relativePath) => {

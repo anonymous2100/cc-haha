@@ -45,7 +45,7 @@ function post(port: number, body: Uint8Array, headers: Record<string, string>) {
 describe('compiled desktop voice worker routing', () => {
   it('boots the real merged entrypoint as a voice worker, loads the runtime by absolute path and serves the private socket', async () => {
     const directory = await realpath(await mkdtemp(path.join(tmpdir(), 'cc-haha-sidecar-voice-worker-')))
-    const executable = path.join(directory, `claude-sidecar-voice-fixture${process.platform === 'win32' ? '.exe' : ''}`)
+    const executable = path.join(directory, `opencode-haha-sidecar-voice-fixture${process.platform === 'win32' ? '.exe' : ''}`)
     const env: NodeJS.ProcessEnv = {
       PATH: process.env.PATH,
       HOME: directory,
@@ -64,7 +64,7 @@ describe('compiled desktop voice worker routing', () => {
     try {
       // Compile the real production entrypoint, not a handwritten worker shim.
       const build = {
-        entrypoints: [path.join(repoRoot, 'desktop/sidecars/claude-sidecar.ts')],
+        entrypoints: [path.join(repoRoot, 'desktop/sidecars/opencode-haha-sidecar.ts')],
         features: ['TRANSCRIPT_CLASSIFIER'],
         minify: { whitespace: true, identifiers: true, syntax: true },
         sourcemap: 'none',

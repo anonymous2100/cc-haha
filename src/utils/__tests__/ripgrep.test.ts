@@ -54,32 +54,32 @@ describe('packaged ripgrep resolution', () => {
     expect(getBundledRipgrepPath({
       platform: 'darwin',
       arch: 'arm64',
-      execPath: '/app/claude-sidecar-aarch64-apple-darwin',
+      execPath: '/app/opencode-haha-sidecar-aarch64-apple-darwin',
     })).toBe('/app/rg')
     expect(getBundledRipgrepPath({
       platform: 'darwin',
       arch: 'x64',
-      execPath: '/app/claude-sidecar-x86_64-apple-darwin',
+      execPath: '/app/opencode-haha-sidecar-x86_64-apple-darwin',
     })).toBe('/app/rg')
     expect(getBundledRipgrepPath({
       platform: 'win32',
       arch: 'x64',
-      execPath: 'C:\\app\\claude-sidecar-x86_64-pc-windows-msvc.exe',
+      execPath: 'C:\\app\\opencode-haha-sidecar-x86_64-pc-windows-msvc.exe',
     })).toBe('C:\\app\\rg.exe')
     expect(getBundledRipgrepPath({
       platform: 'win32',
       arch: 'arm64',
-      execPath: 'C:\\app\\claude-sidecar-aarch64-pc-windows-msvc.exe',
+      execPath: 'C:\\app\\opencode-haha-sidecar-aarch64-pc-windows-msvc.exe',
     })).toBe('C:\\app\\rg.exe')
     expect(getBundledRipgrepPath({
       platform: 'linux',
       arch: 'x64',
-      execPath: '/app/claude-sidecar-x86_64-unknown-linux-gnu',
+      execPath: '/app/opencode-haha-sidecar-x86_64-unknown-linux-gnu',
     })).toBe('/app/rg')
     expect(getBundledRipgrepPath({
       platform: 'linux',
       arch: 'arm64',
-      execPath: '/app/claude-sidecar-aarch64-unknown-linux-gnu',
+      execPath: '/app/opencode-haha-sidecar-aarch64-unknown-linux-gnu',
     })).toBe('/app/rg')
   })
 

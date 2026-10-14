@@ -737,8 +737,8 @@ function addMacosComputerUseAttestationCheck(
   }
 
   const targets = [
-    { name: 'host', path: appBundle, identifier: 'com.claude-code-haha.desktop', deep: true },
-    { name: 'sidecar', path: sidecar, identifier: 'com.claude-code-haha.desktop.sidecar', deep: false },
+    { name: 'host', path: appBundle, identifier: 'com.opencode-haha.desktop', deep: true },
+    { name: 'sidecar', path: sidecar, identifier: 'com.opencode-haha.desktop.sidecar', deep: false },
     { name: 'helper', path: helperApp, identifier: 'dev.cchaha.cu-helper', deep: true },
   ] as const
   const metadata: CodesignMetadata[] = []
@@ -962,7 +962,7 @@ function inspectMacosArtifacts(rootDir: string, report: PackageSmokeReport, opti
       ? 'aarch64-apple-darwin'
       : 'x86_64-apple-darwin'
     const nodePtyArch = report.arch === 'arm64' ? 'darwin-arm64' : 'darwin-x64'
-    const sidecar = join(sidecarDir, `claude-sidecar-${targetTriple}`)
+    const sidecar = join(sidecarDir, `opencode-haha-sidecar-${targetTriple}`)
     const pty = join(prebuildsDir, nodePtyArch, 'pty.node')
     const spawnHelper = join(prebuildsDir, nodePtyArch, 'spawn-helper')
     addPresenceCheck(report, rootDir, `macOS ${report.arch} unpacked sidecar binary`, sidecar)
@@ -993,7 +993,7 @@ function inspectMacosArtifacts(rootDir: string, report: PackageSmokeReport, opti
       report,
       rootDir,
       'macOS unpacked sidecar binary',
-      findMatches(sidecarDir, (candidate) => normalizePath(candidate).includes('/claude-sidecar-')),
+      findMatches(sidecarDir, (candidate) => normalizePath(candidate).includes('/opencode-haha-sidecar-')),
       sidecarDir,
     )
     addMatchCheck(
@@ -1022,7 +1022,7 @@ function inspectMacosArtifacts(rootDir: string, report: PackageSmokeReport, opti
         report,
         rootDir,
         appBundle,
-        join(sidecarDir, `claude-sidecar-${targetTriple}`),
+        join(sidecarDir, `opencode-haha-sidecar-${targetTriple}`),
         helperApp,
         options.commandRunner ?? defaultCommandRunner,
       )
@@ -1083,10 +1083,10 @@ function inspectWindowsArtifacts(rootDir: string, report: PackageSmokeReport) {
     const nodePtyDir = join(unpackedResourcesDir, 'node_modules', 'node-pty')
     const sidecarDir = join(unpackedResourcesDir, 'src-tauri', 'binaries')
     const sidecarNeedle = report.arch === 'arm64'
-      ? '/claude-sidecar-aarch64-pc-windows-msvc.exe'
+      ? '/opencode-haha-sidecar-aarch64-pc-windows-msvc.exe'
       : report.arch === 'x64'
-        ? '/claude-sidecar-x86_64-pc-windows-msvc.exe'
-        : '/claude-sidecar-'
+        ? '/opencode-haha-sidecar-x86_64-pc-windows-msvc.exe'
+        : '/opencode-haha-sidecar-'
     const nodePtyNeedle = report.arch === 'arm64'
       ? '/win32-arm64/'
       : report.arch === 'x64'
@@ -1234,7 +1234,7 @@ function inspectLinuxArtifacts(rootDir: string, report: PackageSmokeReport) {
       report,
       rootDir,
       'Linux unpacked sidecar binary',
-      findMatches(sidecarDir, (candidate) => normalizePath(candidate).includes('/claude-sidecar-')),
+      findMatches(sidecarDir, (candidate) => normalizePath(candidate).includes('/opencode-haha-sidecar-')),
       sidecarDir,
     )
     addBundledRipgrepLicenseChecks(report, rootDir, sidecarDir, 'Linux')

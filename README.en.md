@@ -96,7 +96,7 @@ For users who want to debug the underlying CLI, server, or local development flo
 ```bash
 bun install
 cp .env.example .env
-./bin/claude-haha
+./bin/opencode-haha
 ```
 
 See [environment variables](docs/en/cli/env.md) and [CLI setup](docs/en/cli/index.md) for more configuration options.

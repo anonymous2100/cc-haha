@@ -12,7 +12,7 @@ The repository contains the CLI/TUI, local Server, Electron desktop app, IM adap
 ```text
 .
 ├── bin/
-│   └── claude-haha                 # CLI launcher
+│   └── opencode-haha                 # CLI launcher
 ├── preload.ts                      # Bun preload and build compatibility entry
 ├── package.json                    # Root scripts and dependencies
 ├── src/
@@ -53,7 +53,7 @@ The repository contains the CLI/TUI, local Server, Electron desktop app, IM adap
 │   │   ├── ipc/                    # IPC channels and validation
 │   │   └── services/               # Sidecar, terminal, updater, and preview services
 │   ├── sidecars/
-│   │   └── claude-sidecar.ts       # Unified server / cli / adapters entry
+│   │   └── opencode-haha-sidecar.ts       # Unified server / cli / adapters entry
 │   ├── scripts/                    # Build, packaging, and resource preparation
 │   └── src-tauri/                  # Historical code and current package resources; not the Host
 ├── adapters/
@@ -82,7 +82,7 @@ The repository contains the CLI/TUI, local Server, Electron desktop app, IM adap
 | `src/server/index.ts` | Bun / `Bun.serve` | Local HTTP, WebSocket, and H5 |
 | `desktop/electron/main.ts` | Electron main | Native desktop Host |
 | `desktop/src/` | Chromium Renderer | React desktop UI |
-| `desktop/sidecars/claude-sidecar.ts` | Bun-compiled Sidecar | Packaged Server, CLI, and Adapter entry |
+| `desktop/sidecars/opencode-haha-sidecar.ts` | Bun-compiled Sidecar | Packaged Server, CLI, and Adapter entry |
 | `adapters/<platform>/` | Bun Sidecar | Platform messaging integration |
 
 Place new code at the boundary that owns the responsibility: native desktop capabilities belong in `desktop/electron/`, shared business APIs in `src/server/`, and platform-specific messaging behavior in `adapters/<platform>/`. The Renderer should not bypass these boundaries.

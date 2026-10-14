@@ -696,10 +696,10 @@ class TestDesktopHostIdentity(unittest.TestCase):
     def test_packaged_exe_maps_to_the_host_identity_sent_by_desktop(self):
         source = _win_source()
         self.assertIn(
-            'DESKTOP_HOST_BUNDLE_ID = "com.claude-code-haha.desktop"',
+            'DESKTOP_HOST_BUNDLE_ID = "com.opencode-haha.desktop"',
             source,
         )
-        self.assertIn('stem.casefold() == "claude code haha"', source)
+        self.assertIn('stem.casefold() == "opencode-haha"', source)
         self.assertIn('"bundleId": _windows_bundle_id(exe_path)', source)
 
 

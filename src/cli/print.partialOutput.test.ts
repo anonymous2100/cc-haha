@@ -29,7 +29,7 @@ describe('print mode partial output', () => {
 
       try {
         const child = Bun.spawn(
-          ['./bin/claude-haha', '--bare', '-p', 'Reply briefly'],
+          ['./bin/opencode-haha', '--bare', '-p', 'Reply briefly'],
           {
             cwd: process.cwd(),
             env: {
@@ -106,7 +106,7 @@ describe('print mode partial output', () => {
 
       try {
         const child = Bun.spawn(
-          ['./bin/claude-haha', '--bare', '-p', 'Reply briefly'],
+          ['./bin/opencode-haha', '--bare', '-p', 'Reply briefly'],
           {
             cwd: process.cwd(),
             env: {

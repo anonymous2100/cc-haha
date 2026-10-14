@@ -43,7 +43,7 @@ Every signing request for an official release requires manual approval by an App
 After onboarding is complete, a Windows installer can be inspected in PowerShell:
 
 ```powershell
-Get-AuthenticodeSignature ".\Claude-Code-Haha-<version>-win-x64.exe" |
+Get-AuthenticodeSignature ".\opencode-haha-<version>-win-x64.exe" |
   Format-List Status, StatusMessage, SignerCertificate, TimeStamperCertificate
 ```
 

@@ -9,7 +9,7 @@ import {
   type MediaAccessStatus,
 } from './microphonePermissions'
 
-const APP_ENTRY = '/Applications/Claude Code Haha.app/Contents/Resources/app.asar/dist/index.html'
+const APP_ENTRY = '/Applications/opencode-haha.app/Contents/Resources/app.asar/dist/index.html'
 const APP_URL = pathToFileURL(APP_ENTRY).toString()
 
 type CheckHandler = (

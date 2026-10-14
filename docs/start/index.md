@@ -15,7 +15,7 @@ order: 0
 
 ## 和 Claude Code CLI 是什么关系
 
-Claude Code 是 Anthropic 出的命令行编程 Agent，跑在终端里。cc-haha 的内核就是从 Claude Code 源码修复而来的一份 CLI（仓库里叫 `claude-haha`），桌面端是包在它外面的图形界面。
+Claude Code 是 Anthropic 出的命令行编程 Agent，跑在终端里。cc-haha 的内核就是从 Claude Code 源码修复而来的一份 CLI（仓库里叫 `opencode-haha`），桌面端是包在它外面的图形界面。
 
 对你来说，这意味着两件事：
 

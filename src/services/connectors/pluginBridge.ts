@@ -150,7 +150,7 @@ export function installConnectorPlugin(definition: ConnectorDefinition, installa
     const entry = { name, source: `./plugins/${name}`, version, strict: true }
     await writeAtomic(marketFile, JSON.stringify({
       name: MARKETPLACE,
-      owner: { name: 'Claude Code Haha' },
+      owner: { name: 'opencode-haha' },
       plugins: [...entries.filter(item => item.name !== name), entry],
     }, null, 2))
     clearMarketplacesCache()

@@ -334,7 +334,7 @@ describe('ConversationService', () => {
 
   test('buildChildEnv pins desktop memory to the current sanitized project directory', async () => {
     const service = new ConversationService() as any
-    const workDir = path.join(tmpDir, 'workspace', 'myself_code', 'claude-code-haha')
+    const workDir = path.join(tmpDir, 'workspace', 'myself_code', 'opencode-haha')
     await fs.mkdir(workDir, { recursive: true })
 
     const env = (await service.buildChildEnv(workDir)) as Record<string, string>
@@ -1359,7 +1359,7 @@ describe('ConversationService', () => {
     )) as Record<string, string>
 
     expect(env.CC_HAHA_COMPUTER_USE_HOST_BUNDLE_ID).toBe(
-      'com.claude-code-haha.desktop',
+      'com.opencode-haha.desktop',
     )
     expect(env.CC_HAHA_DESKTOP_SERVER_URL).toBe('http://127.0.0.1:3456')
     expect(env.CC_HAHA_TRACE_API_CALLS).toBe('1')
@@ -1376,7 +1376,7 @@ describe('ConversationService', () => {
       expect(args[2]).toContain('preload.ts')
       expect(args[3]).toContain(path.join('src', 'entrypoints', 'cli.tsx'))
     } else {
-      expect(args[0]).toContain(path.join('bin', 'claude-haha'))
+      expect(args[0]).toContain(path.join('bin', 'opencode-haha'))
     }
   })
 

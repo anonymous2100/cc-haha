@@ -168,7 +168,7 @@ describe('cron scheduler launcher resolution', () => {
 
   unixOnly('executeTask arms the subprocess timeout from CC_HAHA_TASK_TIMEOUT_MS', async () => {
     const binDir = path.join(tmpDir, 'bin')
-    const sidecarPath = path.join(tmpDir, 'claude-sidecar')
+    const sidecarPath = path.join(tmpDir, 'opencode-haha-sidecar')
     const appRoot = path.join(tmpDir, 'app-root')
     await fs.mkdir(binDir, { recursive: true })
     await fs.mkdir(appRoot, { recursive: true })
@@ -218,7 +218,7 @@ describe('cron scheduler launcher resolution', () => {
   })
 
   it('uses the bundled sidecar launcher when one is configured', () => {
-    const sidecarPath = path.join(tmpDir, 'claude-sidecar')
+    const sidecarPath = path.join(tmpDir, 'opencode-haha-sidecar')
     const appRoot = path.join(tmpDir, 'app-root')
 
     const args = buildCronCliArgs(['--print'], {
@@ -283,7 +283,7 @@ describe('cron scheduler launcher resolution', () => {
   unixOnly('executeTask launches the configured desktop sidecar instead of source bun', async () => {
     const binDir = path.join(tmpDir, 'bin')
     const appRoot = path.join(tmpDir, 'app-root')
-    const sidecarPath = path.join(tmpDir, 'claude-sidecar')
+    const sidecarPath = path.join(tmpDir, 'opencode-haha-sidecar')
     const sidecarArgsPath = path.join(tmpDir, 'sidecar.args')
     const bunArgsPath = path.join(tmpDir, 'bun.args')
 
@@ -354,7 +354,7 @@ describe('cron scheduler launcher resolution', () => {
 
   unixOnly('executeTask passes provider-scoped model runtime to the sidecar', async () => {
     const appRoot = path.join(tmpDir, 'app-root')
-    const sidecarPath = path.join(tmpDir, 'claude-sidecar')
+    const sidecarPath = path.join(tmpDir, 'opencode-haha-sidecar')
     const sidecarArgsPath = path.join(tmpDir, 'sidecar.args')
     const sidecarEnvPath = path.join(tmpDir, 'sidecar.env')
 
@@ -440,7 +440,7 @@ describe('cron scheduler launcher resolution', () => {
 
   unixOnly('executeTask applies direct, system, and manual network settings to the sidecar', async () => {
     const appRoot = path.join(tmpDir, 'app-root')
-    const sidecarPath = path.join(tmpDir, 'claude-sidecar')
+    const sidecarPath = path.join(tmpDir, 'opencode-haha-sidecar')
     const sidecarEnvPath = path.join(tmpDir, 'sidecar.env')
     const settingsPath = path.join(process.env.CLAUDE_CONFIG_DIR!, 'settings.json')
 
@@ -517,7 +517,7 @@ describe('cron scheduler launcher resolution', () => {
 
   unixOnly('executeTask reloads the General team preference for each new scheduled process', async () => {
     const appRoot = path.join(tmpDir, 'app-root')
-    const sidecarPath = path.join(tmpDir, 'claude-sidecar')
+    const sidecarPath = path.join(tmpDir, 'opencode-haha-sidecar')
     const teamEnvPath = path.join(tmpDir, 'team.env')
     const settingsPath = path.join(process.env.CLAUDE_CONFIG_DIR!, 'settings.json')
     const envKeys = [
@@ -576,7 +576,7 @@ describe('cron scheduler launcher resolution', () => {
 
   unixOnly('executeTask launches scheduled tasks with full permissions', async () => {
     const appRoot = path.join(tmpDir, 'app-root')
-    const sidecarPath = path.join(tmpDir, 'claude-sidecar')
+    const sidecarPath = path.join(tmpDir, 'opencode-haha-sidecar')
     const sidecarArgsPath = path.join(tmpDir, 'sidecar.args')
 
     await fs.mkdir(appRoot, { recursive: true })
@@ -647,7 +647,7 @@ describe('cron scheduler launcher resolution', () => {
 
   unixOnly('executeTask inherits exported terminal shell variables', async () => {
     const appRoot = path.join(tmpDir, 'app-root')
-    const sidecarPath = path.join(tmpDir, 'claude-sidecar')
+    const sidecarPath = path.join(tmpDir, 'opencode-haha-sidecar')
     const sidecarEnvPath = path.join(tmpDir, 'sidecar.env')
     const shellPath = path.join(tmpDir, 'zsh')
     const nodeBin = path.join(tmpDir, 'node-bin')

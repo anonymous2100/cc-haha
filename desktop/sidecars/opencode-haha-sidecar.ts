@@ -6,9 +6,9 @@
  * 把所有运行模式合并到同一个二进制里，runtime 只保留一份；调用方通过
  * 第一个 positional 参数选择模式：
  *
- *   claude-sidecar server   --app-root <path> --host 127.0.0.1 --port 12345
- *   claude-sidecar cli      --app-root <path> [其它 CLI 参数...]
- *   claude-sidecar adapters --app-root <path> [--feishu] [--telegram] [--wechat]
+ *   opencode-haha-sidecar server   --app-root <path> --host 127.0.0.1 --port 12345
+ *   opencode-haha-sidecar cli      --app-root <path> [其它 CLI 参数...]
+ *   opencode-haha-sidecar adapters --app-root <path> [--feishu] [--telegram] [--wechat]
  *                           [--dingtalk] [--whatsapp] [--wecom] [--qq] [--slack]
  *
  * 任何模式都必须先做 process.env / process.argv 设置，再 await 进入相应的
@@ -128,7 +128,7 @@ const ADAPTERS: ReadonlyArray<{
 const rawArgs = process.argv.slice(2)
 const invocation = resolveSidecarInvocation(rawArgs)
 if (!invocation.mode) {
-  console.error('claude-sidecar: missing mode argument (expected "server", "cli" or "adapters")')
+  console.error('opencode-haha-sidecar: missing mode argument (expected "server", "cli" or "adapters")')
   process.exit(2)
 }
 const mode = invocation.mode
@@ -146,13 +146,13 @@ if (mode === 'adapters') {
   await import('../../preload.ts')
 
   if (mode === 'server') {
-    console.log(`[claude-sidecar] starting server mode (${process.platform}/${process.arch})`)
+    console.log(`[opencode-haha-sidecar] starting server mode (${process.platform}/${process.arch})`)
     const { startServer } = await import('../../src/server/index.ts')
     startServer()
   } else if (mode === 'cli') {
     await import('../../src/entrypoints/cli.tsx')
   } else {
-    console.error(`claude-sidecar: unknown mode "${mode}" (expected "server", "cli" or "adapters")`)
+    console.error(`opencode-haha-sidecar: unknown mode "${mode}" (expected "server", "cli" or "adapters")`)
     process.exit(2)
   }
 }
@@ -176,12 +176,12 @@ async function runAdapters(rawArgs: string[]): Promise<void> {
       enabled.add(arg)
       continue
     }
-    console.warn(`claude-sidecar adapters: ignoring unknown arg "${arg}"`)
+    console.warn(`opencode-haha-sidecar adapters: ignoring unknown arg "${arg}"`)
   }
 
   if (enabled.size === 0) {
     console.error(
-      `claude-sidecar adapters: must enable at least one of ${[...knownFlags].join(' / ')}`,
+      `opencode-haha-sidecar adapters: must enable at least one of ${[...knownFlags].join(' / ')}`,
     )
     process.exit(2)
   }
@@ -205,11 +205,11 @@ async function runAdapters(rawArgs: string[]): Promise<void> {
     if (!enabled.has(adapter.flag)) continue
     if (!(await adapter.isConfigured(config))) {
       console.warn(
-        `[claude-sidecar] ${adapter.flag} requested but ${adapter.missingCredentials} in env or ~/.claude/adapters.json — skipping`,
+        `[opencode-haha-sidecar] ${adapter.flag} requested but ${adapter.missingCredentials} in env or ~/.claude/adapters.json — skipping`,
       )
       continue
     }
-    console.log(`[claude-sidecar] starting ${adapter.label} adapter`)
+    console.log(`[opencode-haha-sidecar] starting ${adapter.label} adapter`)
     await adapter.start()
     started += 1
   }
@@ -222,7 +222,7 @@ async function runAdapters(rawArgs: string[]): Promise<void> {
       return
     }
     console.error(
-      '[claude-sidecar] no adapter could be started — check credentials in env or ~/.claude/adapters.json',
+      '[opencode-haha-sidecar] no adapter could be started — check credentials in env or ~/.claude/adapters.json',
     )
     process.exit(1)
   }

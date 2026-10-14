@@ -14,11 +14,11 @@ The desktop app does not embed the CLI inside React. It is four kinds of process
 ```text
 Electron main
 ├── Chromium renderer (React UI)
-├── claude-sidecar server
+├── opencode-haha-sidecar server
 │   ├── Bun.serve HTTP API
 │   ├── Bun WebSocket session gateway
 │   └── CLI subprocess per session
-└── claude-sidecar adapters (launched per platform)
+└── opencode-haha-sidecar adapters (launched per platform)
     ├── Telegram
     ├── Feishu
     ├── WeChat
@@ -63,7 +63,7 @@ The renderer must not import Electron directly, and must not assemble arbitrary 
 ### Startup sequence
 
 1. Electron resolves the default or portable storage mode and prepares the app config directory.
-2. The host picks a free port and starts the unified `claude-sidecar server` binary.
+2. The host picks a free port and starts the unified `opencode-haha-sidecar server` binary.
 3. The sidecar enters `startServer()` from `src/server/index.ts` and serves HTTP and WebSocket from one `Bun.serve`.
 4. Once the health check passes, the renderer takes the loopback server URL and loads sessions and settings.
 5. The host starts adapter sidecars for the platforms that are configured.
@@ -73,12 +73,12 @@ The server can bind a LAN-reachable address for H5, but the desktop renderer alw
 
 ### Sidecar entry point
 
-`desktop/sidecars/claude-sidecar.ts` is the single entry point:
+`desktop/sidecars/opencode-haha-sidecar.ts` is the single entry point:
 
 ```text
-claude-sidecar server   --app-root <path> --host <host> --port <port>
-claude-sidecar cli      --app-root <path> [CLI arguments]
-claude-sidecar adapters --app-root <path> --telegram|--feishu|--wechat|--dingtalk|--whatsapp|--wecom|--qq|--slack
+opencode-haha-sidecar server   --app-root <path> --host <host> --port <port>
+opencode-haha-sidecar cli      --app-root <path> [CLI arguments]
+opencode-haha-sidecar adapters --app-root <path> --telegram|--feishu|--wechat|--dingtalk|--whatsapp|--wecom|--qq|--slack
 ```
 
 The sidecar sets `CLAUDE_APP_ROOT`, `CALLER_DIR`, and the launch arguments before importing any business module, because the top-level modules of the server, CLI, and adapters read those values at import time.

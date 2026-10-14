@@ -82,7 +82,7 @@ AZURE_OPENAI_CODEX_DEPLOYMENT=your_codex_deployment
 
 ### `.env` 文件
 
-源码仓库中的 `bin/claude-haha` 会在项目根目录存在 `.env` 时加载它：
+源码仓库中的 `bin/opencode-haha` 会在项目根目录存在 `.env` 时加载它：
 
 ```bash
 cp .env.example .env
@@ -121,7 +121,7 @@ ANTHROPIC_DEFAULT_OPUS_MODEL=provider-model
 
 这里不存在可靠的“Shell > `.env` > settings”三段式规则：
 
-1. `bin/claude-haha` 先让 Bun 加载仓库 `.env`。
+1. `bin/opencode-haha` 先让 Bun 加载仓库 `.env`。
 2. CLI 初始化时合并已启用的用户、项目、本地、命令行和受管设置来源。
 3. 已激活的 Haha Provider 会覆盖普通 Claude 设置中的 Provider 路由变量，防止两个客户端互相污染。
 4. 桌面端 host 注入的运行时变量受到保护，不能被 `settings.json` 中的同名字段替换。
