@@ -14,7 +14,14 @@ export async function getWorktreePathsPortable(cwd: string): Promise<string[]> {
     const { stdout } = await execFileAsync(
       'git',
       ['worktree', 'list', '--porcelain'],
-      { cwd, timeout: 5000 },
+      {
+        cwd,
+        timeout: 5000,
+        // The desktop sidecar runs console-less; without CREATE_NO_WINDOW this
+        // git spawn allocates a visible console window that flashes while the
+        // session list loads. No-op on POSIX.
+        windowsHide: true,
+      },
     )
     if (!stdout) return []
     return stdout
