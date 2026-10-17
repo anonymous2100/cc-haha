@@ -1,7 +1,7 @@
 {
   "name": "opencode-haha-desktop",
   "private": true,
-  "version": "0.7.1",
+  "version": "0.7.3",
   "description": "Desktop coding agent workbench for opencode-haha.",
   "homepage": "https://github.com/NanmiCoder/cc-haha",
   "author": {
