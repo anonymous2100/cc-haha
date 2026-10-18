@@ -159,6 +159,7 @@ import {
   modelSupportsAdvisor,
 } from "src/utils/advisor.js";
 import { getAgentContext } from "src/utils/agentContext.js";
+import { getAgentProfile } from "src/utils/agentProfile.js";
 import { isClaudeAISubscriber } from "src/utils/auth.js";
 import {
   getToolSearchBetaHeader,
@@ -294,6 +295,7 @@ import {
   getStreamRetryKind,
   is529Error,
   isRetryableStreamTransportError,
+  isStreamRequestRejection,
   RetriableStreamError,
   type RetryContext,
   withRetry,
@@ -1243,7 +1245,7 @@ async function* queryModel(
   }
 
   let advisorModel: string | undefined;
-  if (isAgenticQuery && isAdvisorEnabled()) {
+  if (getAgentProfile() !== "lean" && isAgenticQuery && isAdvisorEnabled()) {
     let advisorOption = options.advisorModel;
 
     const advisorExperiment = getExperimentAdvisorModels();
@@ -3011,11 +3013,14 @@ async function* queryModel(
       // Keep displayable blocks, but discard uncommitted local tools. Partial
       // text from a clean EOF that cannot be re-streamed is also surfaced with
       // an error, rather than silently accepted or replaced by a second response.
+      // A request the upstream rejected inside the stream is surfaced as well:
+      // the non-streaming copy would get the same answer.
       if (
         retryKind === null &&
         (!canReplay ||
           streamEndedIncomplete ||
-          assistantCommitBuffer.hasCrossedSideEffectBoundary())
+          assistantCommitBuffer.hasCrossedSideEffectBoundary() ||
+          isStreamRequestRejection(streamingError))
       ) {
         for (const committedMessage of assistantCommitBuffer.flushWithoutToolUse()) {
           yield committedMessage;
