@@ -15,7 +15,11 @@ import type {
 } from '../types/provider'
 
 type ProvidersResponse = { providers: SavedProvider[]; activeId: string | null }
-type ProvidersListResponse = ProvidersResponse & { providerOrder?: string[] }
+type ProvidersListResponse = ProvidersResponse & {
+  providerOrder?: string[]
+  /** Saved alias mapping of the built-in DeepSeek account provider. */
+  deepSeekAccountModels?: ModelMapping
+}
 type ProvidersReorderResponse = { providers: SavedProvider[]; providerOrder?: string[] }
 type ProviderResponse = { provider: SavedProvider }
 type TestResultResponse = { result: ProviderTestResult }
@@ -31,8 +35,14 @@ export const providersApi = {
     return api.get<ProvidersListResponse>('/api/providers')
   },
 
-  authStatus() {
-    return api.get<AuthStatusResponse>('/api/providers/auth-status')
+  /**
+   * Without `providerId` the server judges the global default provider; with
+   * one (a saved provider id or a built-in id such as `claude-official`) it
+   * judges only that provider's credentials.
+   */
+  authStatus(providerId?: string) {
+    const query = providerId ? `?providerId=${encodeURIComponent(providerId)}` : ''
+    return api.get<AuthStatusResponse>(`/api/providers/auth-status${query}`)
   },
 
   getSettings() {

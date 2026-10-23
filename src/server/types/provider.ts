@@ -15,6 +15,7 @@ export const PROVIDER_TOOL_SEARCH_OPT_IN_SCHEMA_VERSION = 4
 export const PROVIDER_REQUEST_COMPATIBILITY_SCHEMA_VERSION = 5
 export const PROVIDER_OFFICIAL_MODEL_SETTINGS_SCHEMA_VERSION = 6
 export const PROVIDER_IMAGE_PROTOCOL_SCHEMA_VERSION = 7
+export const PROVIDER_DEEPSEEK_ACCOUNT_MODEL_IDS_SCHEMA_VERSION = 8
 export const BUILT_IN_PROVIDER_IDS = [
   CLAUDE_OFFICIAL_PROVIDER_ID,
   OPENAI_OFFICIAL_PROVIDER_ID,
@@ -32,6 +33,14 @@ export const ApiFormatSchema = z.enum([
   'openai_responses',  // OpenAI Responses API /v1/responses
 ])
 export type ApiFormat = z.infer<typeof ApiFormatSchema>
+
+/**
+ * Protocols a preset can route one model family to. Wider than ApiFormat: a
+ * gateway may serve a family only over a protocol no provider record is saved
+ * with (OpenCode Go serves Gemini only over Google `generateContent`).
+ */
+export const ModelApiFormatSchema = z.enum([...ApiFormatSchema.options, 'gemini'])
+export type ModelApiFormat = z.infer<typeof ModelApiFormatSchema>
 
 export const ProviderAuthStrategySchema = z.enum([
   'api_key',

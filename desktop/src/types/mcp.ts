@@ -47,11 +47,16 @@ export type McpUpsertPayload = {
 
 export type McpSessionSync = {
   applied: boolean
-  reason?: 'not_running' | 'different_project' | 'failed' | 'no_session'
+  reason?: 'not_running' | 'different_project' | 'failed' | 'no_session' | 'lean_profile'
   error?: string
 }
 
 export type McpToggleResult = {
+  server: McpServerRecord
+  sessionSync?: McpSessionSync
+}
+
+export type McpReconnectResult = {
   server: McpServerRecord
   sessionSync?: McpSessionSync
 }

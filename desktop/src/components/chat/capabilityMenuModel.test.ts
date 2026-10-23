@@ -112,16 +112,10 @@ function rootItem(input: CapabilityMenuInput, key: string): CapabilityMenuItem {
   return item
 }
 
-function moreItem(input: CapabilityMenuInput, key: string): CapabilityMenuItem {
-  const item = rootItem(input, 'more').children!.find(candidate => candidate.key === key)
-  if (!item) throw new Error(`missing More item ${key}`)
-  return item
-}
-
 const keys = (items: CapabilityMenuItem[]) => items.map(item => item.key)
 
 describe('buildCapabilitySections', () => {
-  it('splits the root into things for this task, how it runs, and More', () => {
+  it('splits the root into things for this task, how it runs, and the other tools', () => {
     const sections = buildCapabilitySections(buildInput())
     expect(sections.map(section => [section.id, section.title, section.showTitle])).toEqual([
       ['use', 'chat.capabilities.sectionUse', true],
@@ -131,7 +125,9 @@ describe('buildCapabilitySections', () => {
     expect(keys(sections[0]!.items)).toEqual(['skills', 'connectors', 'add-files'])
     expect(sections[0]!.items[2]!.action).toEqual({ type: 'attachment' })
     expect(keys(sections[1]!.items)).toEqual(['agent-team', 'computer-use'])
-    expect(keys(sections[2]!.items[0]!.children!)).toEqual(['agents', 'workflows', 'slash-commands'])
+    // Agents, workflows and slash commands sit on the root, not behind a More row.
+    expect(keys(sections[2]!.items)).toEqual(['agents', 'workflows', 'slash-commands'])
+    expect(sections[2]!.items[2]!.action).toEqual({ type: 'slashTrigger' })
   })
 
   it('leads Skills with recent ones, then all skills, market picks and the market', () => {
@@ -282,7 +278,7 @@ describe('buildCapabilitySections', () => {
   })
 
   it('lists active agents as /agent text insertions and skips inactive ones', () => {
-    const agents = moreItem(buildInput(), 'agents')
+    const agents = rootItem(buildInput(), 'agents')
     expect(agents.count).toBe(1)
     expect(agents.children![0]).toMatchObject({ key: 'agent:debugger', action: { type: 'insertSlashText', command: 'agent debugger' } })
     expect(agents.children!.some(child => child.key === 'agent:retired')).toBe(false)
@@ -290,7 +286,7 @@ describe('buildCapabilitySections', () => {
   })
 
   it('lists workflows as /name text insertions with a save footer', () => {
-    const workflows = moreItem(buildInput(), 'workflows')
+    const workflows = rootItem(buildInput(), 'workflows')
     expect(workflows.count).toBe(1)
     expect(workflows.children![0]!.action).toEqual({ type: 'insertSlashText', command: 'nightly-review' })
     expect(workflows.children!.at(-1)!.action).toEqual({ type: 'saveWorkflowPanel' })
@@ -339,4 +335,46 @@ it('shows each connector with its catalog logo and the plug as fallback', () => 
   }
   // The category row itself keeps the plain plug.
   expect(item.icon).toMatchObject({ kind: 'lucide' })
+})
+
+describe('the Agent mode row', () => {
+  const runKeys = (input: CapabilityMenuInput) => keys(buildCapabilitySections(input)[1]!.items)
+
+  it('is absent while there is nothing to pick or to say', () => {
+    expect(runKeys(buildInput())).toEqual(['agent-team', 'computer-use'])
+  })
+
+  it('leads the run group on a draft, offering both modes with Standard explained', () => {
+    const input = buildInput({ agentProfile: { value: 'standard', locked: false } })
+    expect(runKeys(input)).toEqual(['agent-profile', 'agent-team', 'computer-use'])
+    const row = rootItem(input, 'agent-profile')
+    expect(row.choice).toMatchObject({ value: 'standard', locked: false })
+    expect(row.choice!.options.map(option => [option.value, option.label, option.action])).toEqual([
+      ['standard', 'agentProfile.standard', { type: 'setAgentProfile', profile: 'standard' }],
+      ['lean', 'agentProfile.leanShort', { type: 'setAgentProfile', profile: 'lean' }],
+    ])
+    // Standard has no limits to list; it says when the choice is made.
+    expect(row.detail).toEqual([{ text: 'agentProfile.standardSummary' }, { text: 'agentProfile.draftHint' }])
+  })
+
+  it('lists what lean offers and gives up before the draft commits to it', () => {
+    const row = rootItem(buildInput({ agentProfile: { value: 'lean', locked: false } }), 'agent-profile')
+    expect(row.detail).toEqual([
+      { text: 'agentProfile.leanSummary' },
+      { label: 'agentProfile.availableLabel', text: 'agentProfile.available' },
+      { label: 'agentProfile.unavailableLabel', text: 'agentProfile.unavailable' },
+      { text: 'agentProfile.draftHint' },
+    ])
+  })
+
+  it('is the read-only record of a locked session: it says so and still lists lean limits', () => {
+    const lean = rootItem(buildInput({ agentProfile: { value: 'lean', locked: true } }), 'agent-profile')
+    expect(lean.choice).toMatchObject({ value: 'lean', locked: true })
+    expect(lean.detail).toEqual([
+      { text: 'agentProfile.locked' },
+      { label: 'agentProfile.unavailableLabel', text: 'agentProfile.unavailable' },
+    ])
+    const standard = rootItem(buildInput({ agentProfile: { value: 'standard', locked: true } }), 'agent-profile')
+    expect(standard.detail).toEqual([{ text: 'agentProfile.locked' }])
+  })
 })

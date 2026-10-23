@@ -23,7 +23,7 @@ export type MockReply =
   | {
     kind: 'message'
     content: MockContentBlock[]
-    stopReason: 'end_turn' | 'tool_use'
+    stopReason: 'end_turn' | 'tool_use' | 'refusal'
     /** Delay between streamed text chunks; only the interrupt scenario needs it. */
     chunkDelayMs?: number
   }
@@ -52,6 +52,7 @@ export type MockRequest = {
 /** Prompt that makes the scripted model fail the request the way a provider would. */
 export const UPSTREAM_ERROR_TRIGGER = 'MOCK_UPSTREAM_ERROR'
 export const UPSTREAM_ERROR_MESSAGE = 'mock upstream rejected this request'
+export const UPSTREAM_REFUSAL_TRIGGER = 'MOCK_UPSTREAM_REFUSAL'
 
 function blocksOf(message: RequestMessage | undefined): RequestBlock[] {
   if (!message) return []
@@ -155,11 +156,25 @@ export function decideReply(request: MockRequest): MockReply {
     return { kind: 'error', status: 400, errorType: 'invalid_request_error', message: UPSTREAM_ERROR_MESSAGE }
   }
 
+  if (prompt.includes(UPSTREAM_REFUSAL_TRIGGER)) {
+    return { kind: 'message', content: [], stopReason: 'refusal' }
+  }
+
   const isAgentTurn = hasTool(request, 'Write') || hasTool(request, 'Bash')
   if (!isAgentTurn) return text('Mock title')
 
   // A tool just ran: report what came back, the way a model summarises a result.
   const results = blocksOf(last).filter((block) => block.type === 'tool_result')
+  if (prompt === 'MOCK_LATE_MCP' && !results.some(block => toolResultText(block).includes('LATE_MCP_AVAILABLE'))) {
+    const toolName = 'mcp__late_start__echo'
+    if (hasTool(request, toolName)) return toolUse(toolName, {})
+    if (hasTool(request, 'ToolSearch') && !results.some(block => block.is_error)) return toolUse('ToolSearch', { query: `select:${toolName}` })
+    return text('Late MCP tool is unavailable')
+  }
+  if (prompt === 'MOCK_DEEPSEEK_SEARCH' && !results.some(block => toolResultText(block).includes('DEEPSEEK_SUMMARY_REACHED_MODEL') || block.is_error)) {
+    if (hasTool(request, 'WebSearch')) return toolUse('WebSearch', { query: 'DeepSeek fixture' })
+    if (hasTool(request, 'ToolSearch')) return toolUse('ToolSearch', { query: 'select:WebSearch' })
+  }
   const imageTool = prompt.startsWith('MOCK_IMAGE_EDIT ') ? 'ImageEdit' : 'ImageGen'
   if (prompt.startsWith('MOCK_IMAGE_')) {
     // A deferred tool may first be loaded by ToolSearch. The next request must
@@ -193,6 +208,14 @@ export function decideReply(request: MockRequest): MockReply {
       question: 'Choose A or B', header: 'Choice', multiSelect: false,
       options: [{ label: 'A', description: 'First option' }, { label: 'B', description: 'Second option' }],
     }] })
+  }
+
+  if (prompt.startsWith('MOCK_SESSION_EXPLICIT ') && hasTool(request, 'CreateSessions')) {
+    const runtime = JSON.parse(prompt.slice('MOCK_SESSION_EXPLICIT '.length))
+    return toolUse('CreateSessions', { requestId: 'mock-explicit', sessions: [{ title: 'Explicit review', prompt: 'Reply with Ready when you are.', runtime, userInstruction: { quote: prompt } }] })
+  }
+  if (prompt === 'MOCK_SESSION_DELEGATION' && hasTool(request, 'CreateSessions')) {
+    return toolUse('CreateSessions', { requestId: 'mock-delegation', sessions: [{ title: 'Independent review', prompt: 'Reply with Ready when you are.' }] })
   }
 
   const cwd = workingDirectoryOf(request)

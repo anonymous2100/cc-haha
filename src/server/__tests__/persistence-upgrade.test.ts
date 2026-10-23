@@ -103,6 +103,36 @@ describe('persistent storage upgrade migrations', () => {
     expect(await new SettingsService().getAgentTeamsEnabled()).toBe(false)
   })
 
+  test('upgrades the legacy lean mode preference on read without rewriting shared user settings', async () => {
+    const userPath = path.join(tempDir, 'settings.json')
+    const legacy = {
+      env: { UNKNOWN_ENV: 'preserved' },
+      updateProxy: { mode: 'manual', url: 'http://127.0.0.1:7890' },
+      unknownFuturePreference: { keep: true },
+    }
+    const original = JSON.stringify(legacy)
+    await fs.writeFile(userPath, original)
+    const service = new SettingsService()
+
+    expect(await service.getLeanModeEnabled()).toBe(false)
+    expect(await fs.readFile(userPath, 'utf-8')).toBe(original)
+    await service.updateUserSettings({ leanModeEnabled: false })
+
+    expect(await new SettingsService().getLeanModeEnabled()).toBe(false)
+    expect(JSON.parse(await fs.readFile(userPath, 'utf-8'))).toEqual({ ...legacy, leanModeEnabled: false })
+    await service.updateUserSettings({ leanModeEnabled: true })
+    expect(await new SettingsService().getLeanModeEnabled()).toBe(true)
+  })
+
+  test('rejects a non-boolean lean mode choice without changing the settings file', async () => {
+    const userPath = path.join(tempDir, 'settings.json')
+    const original = JSON.stringify({ leanModeEnabled: false, unknownFuturePreference: 'keep' })
+    await fs.writeFile(userPath, original)
+
+    await expect(new SettingsService().updateUserSettings({ leanModeEnabled: 'false' })).rejects.toThrow('leanModeEnabled must be a boolean')
+    expect(await fs.readFile(userPath, 'utf-8')).toBe(original)
+  })
+
   test('upgrades the legacy automatic update preference on read without rewriting shared user settings', async () => {
     const userPath = path.join(tempDir, 'settings.json')
     const legacy = {
@@ -255,7 +285,88 @@ describe('persistent storage upgrade migrations', () => {
     // Falling back to null here silently switched the user to Claude Official
     // on the next start while the managed env still pointed at DeepSeek.
     expect(migrated.activeId).toBe('deepseek-account')
-    expect(migrated.officialProviderModels['deepseek-account']?.main).toBe('deepseek-v4-flash')
+    expect(migrated.officialProviderModels['deepseek-account']?.main).toBe('deepseek-flash')
+  })
+
+  test('points a saved DeepSeek Account mapping at the flash model the account lists', async () => {
+    const ccHahaDir = path.join(tempDir, 'cc-haha')
+    await fs.mkdir(ccHahaDir, { recursive: true })
+    const savedMapping = {
+      main: 'deepseek-v4-pro[1m]',
+      haiku: 'deepseek-v4-flash',
+      sonnet: ' deepseek-v4-flash ',
+      opus: 'deepseek-v4-pro[1m]',
+      futureSlot: 'keep-me',
+    }
+    await fs.writeFile(
+      path.join(ccHahaDir, 'providers.json'),
+      JSON.stringify({
+        schemaVersion: 7,
+        activeId: 'deepseek-account',
+        providers: [],
+        officialProviderModels: {
+          'deepseek-account': savedMapping,
+          // Only the account mapping moves to the account's listed flash model.
+          'openai-official': {
+            main: 'deepseek-v4-flash',
+            haiku: 'deepseek-v4-flash',
+            sonnet: 'deepseek-v4-flash',
+            opus: 'deepseek-v4-flash',
+          },
+        },
+      }, null, 2),
+      'utf-8',
+    )
+
+    const report = await ensurePersistentStorageUpgraded()
+
+    expect(report.failures).toEqual([])
+    expect(report.migratedEntries).toContain('cc-haha/providers.json')
+    const migrated = JSON.parse(
+      await fs.readFile(path.join(ccHahaDir, 'providers.json'), 'utf-8'),
+    ) as {
+      schemaVersion: number
+      officialProviderModels: Record<string, Record<string, string>>
+    }
+    expect(migrated.schemaVersion).toBe(CURRENT_PROVIDER_INDEX_SCHEMA_VERSION)
+    expect(migrated.officialProviderModels['deepseek-account']).toEqual({
+      main: 'deepseek-v4-pro[1m]',
+      haiku: 'deepseek-flash',
+      sonnet: 'deepseek-flash',
+      opus: 'deepseek-v4-pro[1m]',
+      futureSlot: 'keep-me',
+    })
+    expect(migrated.officialProviderModels['openai-official']?.haiku).toBe('deepseek-v4-flash')
+    const backups = (await fs.readdir(ccHahaDir)).filter((name) =>
+      name.startsWith('providers.json.bak-before-migration-'))
+    expect(backups).toHaveLength(1)
+    expect(JSON.parse(await fs.readFile(path.join(ccHahaDir, backups[0]!), 'utf-8'))
+      .officialProviderModels['deepseek-account']).toEqual(savedMapping)
+  })
+
+  test('leaves a DeepSeek Account mapping saved under the current schema as the user chose it', async () => {
+    const ccHahaDir = path.join(tempDir, 'cc-haha')
+    await fs.mkdir(ccHahaDir, { recursive: true })
+    const current = {
+      schemaVersion: CURRENT_PROVIDER_INDEX_SCHEMA_VERSION,
+      activeId: 'deepseek-account',
+      providers: [],
+      providerOrder: ['claude-official', 'openai-official', 'grok-official', 'deepseek-account'],
+      officialProviderModels: {
+        'deepseek-account': {
+          main: 'deepseek-v4-flash',
+          haiku: 'deepseek-v4-flash',
+          sonnet: 'deepseek-v4-flash',
+          opus: 'deepseek-v4-flash',
+        },
+      },
+    }
+    await fs.writeFile(path.join(ccHahaDir, 'providers.json'), JSON.stringify(current, null, 2), 'utf-8')
+
+    const report = await ensurePersistentStorageUpgraded()
+
+    expect(report.migratedEntries).not.toContain('cc-haha/providers.json')
+    expect(JSON.parse(await fs.readFile(path.join(ccHahaDir, 'providers.json'), 'utf-8'))).toEqual(current)
   })
 
   test('upgrades a version 2 provider fixture without inventing image credentials', async () => {

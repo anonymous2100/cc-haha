@@ -5,10 +5,7 @@ import {
   getClaudeCodeModelCapabilities,
   type ModelReasoningProviderKind,
 } from '../../shared/modelReasoning.js'
-import {
-  resolveModelApiFormat,
-  type ModelApiFormatRule,
-} from '../../shared/modelApiFormats.js'
+import type { ModelApiFormatRule } from '../../shared/modelApiFormats.js'
 import { MODEL_CONTEXT_WINDOWS_ENV_KEY } from '../../utils/model/modelContextWindows.js'
 import { PROVIDER_MAX_OUTPUT_TOKENS_ENV_KEY } from '../../utils/managedEnvConstants.js'
 import {
@@ -22,6 +19,7 @@ import {
 import { PROVIDER_PRESETS } from '../config/providerPresets.js'
 import type {
   ApiFormat,
+  ModelApiFormat,
   ProviderAuthStrategy,
   ProvidersIndex,
   SavedProvider,
@@ -31,6 +29,7 @@ import {
   DEEPSEEK_ACCOUNT_PROVIDER_ID,
   GROK_OFFICIAL_PROVIDER_ID,
   OPENAI_OFFICIAL_PROVIDER_ID,
+  PROVIDER_DEEPSEEK_ACCOUNT_MODEL_IDS_SCHEMA_VERSION,
   PROVIDER_TOOL_SEARCH_OPT_IN_SCHEMA_VERSION,
 } from '../types/provider.js'
 import {
@@ -54,6 +53,7 @@ import {
   DEEPSEEK_OAUTH_FILE_ENV_KEY,
   DEEPSEEK_OAUTH_PROVIDER_ENV_KEY,
   applyDeepSeekAccountRuntimeEnv,
+  migrateLegacyDeepSeekAccountModels,
   isDeepSeekAccountProviderId,
 } from './deepseekAccountProvider.js'
 
@@ -355,6 +355,15 @@ export function normalizeProvidersIndex(value: unknown): ProvidersIndex | null {
       delete officialProviderModels[id]
     }
   }
+  // Readers can see an index the startup migration has not rewritten yet.
+  const deepSeekAccountModels = officialProviderModels[DEEPSEEK_ACCOUNT_PROVIDER_ID]
+  if (
+    schemaVersion < PROVIDER_DEEPSEEK_ACCOUNT_MODEL_IDS_SCHEMA_VERSION &&
+    isProviderModels(deepSeekAccountModels)
+  ) {
+    officialProviderModels[DEEPSEEK_ACCOUNT_PROVIDER_ID] =
+      migrateLegacyDeepSeekAccountModels(deepSeekAccountModels)
+  }
 
   return {
     ...rest,
@@ -391,7 +400,7 @@ export function getPresetAuthStrategy(presetId: string): ProviderAuthStrategy {
  * rather than the saved provider on purpose: the rules ship with the app version,
  * so they need neither persistence nor a migration nor an edit-form control.
  */
-export function getPresetModelApiFormats(presetId: string): ModelApiFormatRule<ApiFormat>[] {
+export function getPresetModelApiFormats(presetId: string): ModelApiFormatRule<ModelApiFormat>[] {
   return PROVIDER_PRESETS.find((preset) => preset.id === presetId)?.modelApiFormats ?? []
 }
 
@@ -415,15 +424,6 @@ export function resolveProviderApiFormat(
   const providerFormat = provider.apiFormat ?? 'anthropic'
   if (getPresetModelApiFormats(provider.presetId).length === 0) return providerFormat
   return PROVIDER_PRESETS.find((preset) => preset.id === provider.presetId)?.apiFormat ?? providerFormat
-}
-
-/** The protocol a request for this model actually uses, provider format otherwise. */
-export function resolveProviderModelApiFormat(
-  provider: Pick<SavedProvider, 'presetId' | 'apiFormat'>,
-  modelId: string | null | undefined,
-): ApiFormat {
-  return resolveModelApiFormat(getPresetModelApiFormats(provider.presetId), modelId)
-    ?? resolveProviderApiFormat(provider)
 }
 
 function getPresetModelContextWindows(presetId: string): Record<string, number> {

@@ -1,3 +1,5 @@
+import { AgentProfileControl, type AgentProfileControlHandle } from '@/components/chat/AgentProfileControl'
+import { isLeanSlashCommand, isUnsupportedLeanSlashInput } from '@/lib/agentProfile'
 import { useSideChatStore } from '@/stores/sideChatStore'
 import { openSideChat } from '@/lib/workspace/openSideChat'
 import { parseSideQuestionCommand } from './composerUtils'
@@ -6,7 +8,7 @@ import { normalizeSessionReferences } from '@/lib/sessionReferences'
 import { isComposerReferenceVisible, isComposerSlashCommandVisible } from '@/lib/composerCapabilityVisibility'
 import { useState, useRef, useEffect, useCallback, useMemo, useId } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { ArrowUp, CornerDownRight, Cpu, Gauge, Pencil, Plus, ShieldCheck, Square, Trash2 } from 'lucide-react'
+import { ArrowUp, CornerDownRight, Cpu, Feather, Gauge, Pencil, Plus, ShieldCheck, Square, Trash2 } from 'lucide-react'
 import { useDismissable } from '@/hooks/useDismissable'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
@@ -37,19 +39,21 @@ import type { AttachmentRef } from '../../types/chat'
 import { AttachmentGallery } from './AttachmentGallery'
 import { ComposerDropOverlay } from './ComposerDropOverlay'
 import { ProjectContextChip } from '@/components/chat/ProjectContextChip'
-import { RepositoryLaunchControls } from '@/components/chat/RepositoryLaunchControls'
+import { RepositoryLaunchControls, type RepositoryLaunchControlsHandle } from '@/components/chat/RepositoryLaunchControls'
 import { ComposerReferenceMenu, type ComposerReferenceMenuHandle } from './ComposerReferenceMenu'
 import { ComposerReferenceDetail } from './ComposerReferenceDetail'
 import { ComposerCapabilityMenu } from './ComposerCapabilityMenu'
 import { MobileComposerSheet, type MobileComposerSetting } from './MobileComposerSheet'
 import { MobileApprovalDock } from './MobileApprovalDock'
 import { useCapabilityMenu } from './useCapabilityMenu'
+import { AgentProfileChip } from './AgentProfileChip'
 import { AgentTeamChip } from './AgentTeamChip'
 import { ComputerUseEnableDialog } from '@/components/computer-use/ComputerUseEnableDialog'
 import { AgentTeamsCostDialog } from '@/components/agentTeams/AgentTeamsCostDialog'
 import { withAgentTeamRequest } from '@/lib/agentTeamRequest'
 import { recordRecentSkills } from '@/lib/recentSkills'
 import { composerReferencesApi, mentionProviderId } from '@/api/composerReferences'
+import { useCapabilityCatalogStore } from '@/stores/capabilityCatalogStore'
 import type { ComposerReferenceCandidate } from '@/types/composerReference'
 import { LocalSlashCommandPanel, type LocalSlashCommandName } from './LocalSlashCommandPanel'
 import { getSlashCommandOptionId, SlashCommandMenu } from './SlashCommandMenu'
@@ -192,8 +196,10 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
   const panelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const modelSelectorRef = useRef<ModelSelectorHandle>(null)
+  const launchControlsRef = useRef<RepositoryLaunchControlsHandle>(null)
   const permissionSelectorRef = useRef<PermissionModeSelectorHandle>(null)
   const contextUsageRef = useRef<ContextUsageIndicatorHandle>(null)
+  const agentProfileRef = useRef<AgentProfileControlHandle>(null)
   const plusMenuRef = useRef<HTMLDivElement>(null)
   const slashMenuRef = useRef<HTMLDivElement>(null)
   const fileSearchRef = useRef<ComposerReferenceMenuHandle>(null)
@@ -202,6 +208,8 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
   const referenceMenuId = useId()
   const capabilityMenuId = useId()
   const previousActiveTabIdRef = useRef<string | null>(null)
+  // The chat on screen right now, for work that outlasts the click that began it.
+  const currentChatRef = useRef<string | null>(null)
   const inputRef = useRef(input)
   const mentionsRef = useRef(mentions)
   const attachmentsRef = useRef(attachments)
@@ -244,6 +252,7 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
   })))
   const selectedTabId = useTabStore((s) => s.activeTabId)
   const activeTabId = sessionId ?? selectedTabId
+  currentChatRef.current = activeTabId
   const activeTabType = useTabStore((s) =>
     s.tabs.find((tab) => tab.sessionId === (sessionId ?? s.activeTabId))?.type,
   )
@@ -251,6 +260,7 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
   const repositoryLaunchDraft = sessionState?.repositoryLaunchDraft
   const launchWorkDir = repositoryLaunchDraft?.workDir ?? ''
   const launchBranch = repositoryLaunchDraft?.branch ?? null
+  const launchBranchAutomatic = repositoryLaunchDraft?.branchAutomatic ?? false
   const launchUseWorktree = repositoryLaunchDraft?.useWorktree ?? false
   const chatState = sessionState?.chatState ?? 'idle'
   // While a question is waiting, the card is the only way to reach the model: it
@@ -276,6 +286,7 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
   const sideChat = useSideChatStore(state => activeTabId ? state.entries[activeTabId] : undefined)
   const listedSession = useSessionStore((state) => activeTabId ? state.sessions.find((session) => session.id === activeTabId) ?? null : null)
   const activeSession = listedSession ?? (sideChat ? { ...sideChat, id: sideChat.sessionId, workDirExists: true, workspaceState: 'available' as const, messageCount: 1, projectRoot: sideChat.workDir } : null)
+  const isLean = listedSession?.agentProfile === 'lean'
   const loadedMessageCount = sessionState?.messages?.length ?? 0
   const messageCount = Math.max(loadedMessageCount, activeSession?.messageCount ?? 0)
   const memberInfo = useTeamStore((s) => activeTabId ? s.getMemberBySessionId(activeTabId) : null)
@@ -301,6 +312,14 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
   const setLaunchBranch = useCallback((branch: string | null) => {
     updateRepositoryLaunchDraft((current) => ({ ...current, branch }))
   }, [updateRepositoryLaunchDraft])
+  // The controls are mounted again whenever the user comes back to this chat;
+  // keeping whether they chose the branch lets them keep following the checkout.
+  const setLaunchBranchAutomatic = useCallback((branchAutomatic: boolean) => {
+    if (!activeTabId) return
+    const current = useChatStore.getState().sessions[activeTabId]?.repositoryLaunchDraft
+    if ((current?.branchAutomatic ?? false) === branchAutomatic) return
+    updateRepositoryLaunchDraft((draft) => ({ ...draft, branchAutomatic }))
+  }, [activeTabId, updateRepositoryLaunchDraft])
   const setLaunchUseWorktree = useCallback((useWorktree: boolean) => {
     updateRepositoryLaunchDraft((current) => ({ ...current, useWorktree }))
   }, [updateRepositoryLaunchDraft])
@@ -349,7 +368,7 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
   const isHeroComposer = variant === 'hero' && !isMemberSession && !compact
   const resolvedWorkDir = activeSession?.workDir || gitInfo?.workDir || undefined
   const showLaunchControls = !isMemberSession && !sideChat && messageCount === 0
-  const sideChatAvailable = Boolean(sideChat) || messageCount > 0
+  const sideChatAvailable = !isLean && (Boolean(sideChat) || messageCount > 0)
   // `useCompactControls` is about room, so it asks the column how wide it is —
   // never "is a side panel open". Until a measurement lands (jsdom, first
   // paint) it defers to the caller's `compact`, which keeps the
@@ -360,20 +379,21 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
   const activeLaunchWorkDir = showLaunchControls ? (launchWorkDir || resolvedWorkDir || '') : (resolvedWorkDir || '')
   const referenceCwd = activeLaunchWorkDir || resolvedWorkDir || ''
   const referenceProviderId = mentionProviderId(runtimeSelection)
-  const referenceContext = `${activeTabId ?? ''}\0${referenceCwd}\0${referenceProviderId ?? ''}`
+  const referenceContext = `${activeTabId ?? ''}\0${referenceCwd}\0${referenceProviderId ?? ''}\0${isLean ? 'lean' : 'standard'}`
   const referenceCurrent = referenceState?.context === referenceContext ? referenceState : null
-  const composerReferences = useMemo(() => (referenceCurrent?.items ?? EMPTY_COMPOSER_REFERENCES).filter(isComposerReferenceVisible), [referenceCurrent?.items])
+  const composerReferences = useMemo(() => (referenceCurrent?.items ?? EMPTY_COMPOSER_REFERENCES).filter(reference => isComposerReferenceVisible(reference) && (!isLean || reference.kind === 'skill')), [referenceCurrent?.items, isLean])
   useEffect(() => {
     let active = true
     if (isMemberSession) return
     setReferenceState({ context: referenceContext, items: [], loading: true, error: false })
-    void composerReferencesApi.list(referenceCwd || undefined, referenceProviderId).then(data => {
+    void composerReferencesApi.list(referenceCwd || undefined, referenceProviderId, isLean ? 'lean' : undefined).then(data => {
+      useCapabilityCatalogStore.getState().remember([...data.plugins, ...data.skills])
       if (active) setReferenceState({ context: referenceContext, items: [...data.plugins, ...data.skills], loading: false, error: false })
     }).catch(() => {
       if (active) setReferenceState({ context: referenceContext, items: [], loading: false, error: true })
     })
     return () => { active = false }
-  }, [referenceContext, referenceCwd, referenceProviderId, isMemberSession, slashMenuOpen, fileSearchOpen, plusMenuOpen, referencesVersion])
+  }, [referenceContext, referenceCwd, referenceProviderId, isLean, isMemberSession, slashMenuOpen, fileSearchOpen, plusMenuOpen, referencesVersion])
   useEffect(() => {
     setReferenceDetail(null)
     setReferenceOptionId(undefined)
@@ -672,6 +692,8 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
     },
   })
 
+  // A lean session's own list already passed the lean runtime rule.
+  const listedSlashCommandNames = useMemo(() => new Set(slashCommands.map(command => command.name)), [slashCommands])
   const allSlashCommands = useMemo(() => {
     const commands = appendAgentSlashCommands(mergeSlashCommands(slashCommands, getLocalizedFallbackCommands(t)), agentSlashCommands)
     const names = new Set(commands.map(command => command.name.toLowerCase()))
@@ -682,8 +704,8 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
       commands.push({ name, description: reference.description, kind: reference.kind })
     }
     // `/btw` forks the conversation so far; a blank session has none to fork.
-    return commands.filter(command => isComposerSlashCommandVisible(command) && (sideChatAvailable || command.name !== 'btw'))
-  }, [agentSlashCommands, slashCommands, composerReferences, sideChatAvailable, t])
+    return commands.filter(command => isComposerSlashCommandVisible(command) && (!isLean || isLeanSlashCommand(command, listedSlashCommandNames)) && (sideChatAvailable || command.name !== 'btw'))
+  }, [agentSlashCommands, slashCommands, listedSlashCommandNames, composerReferences, sideChatAvailable, isLean, t])
 
   const filteredCommandGroups = useMemo(() => {
     return groupSlashCommands(filterSlashCommands(allSlashCommands, slashFilter))
@@ -823,7 +845,7 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
       : undefined
     const newId = await createSession(
       workDir || undefined,
-      createOptions,
+      isLean ? { ...createOptions, agentProfile: 'lean' } : createOptions,
     )
     if (inputRef.current.length > 0 || attachmentsRef.current.length > 0) {
       setComposerDraft(newId, {
@@ -840,7 +862,7 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
     connectToSession(newId)
     deleteSession(oldId).catch(() => {})
     return newId
-  }, [activeTabId])
+  }, [activeTabId, isLean])
 
   const handleLaunchWorkDirChange = useCallback(async (newWorkDir: string) => {
     updateRepositoryLaunchDraft(() => ({
@@ -869,6 +891,16 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
     // slash-Enter, programmatic) funnels through here.
     if (questionPending) return
     const text = input.trim()
+    if (isLean && resolvedPermissionMode === 'plan') {
+      useUIStore.getState().addToast({ type: 'info', message: t('agentProfile.planUnavailable') })
+      return
+    }
+    // `/btw` becomes a side chat here, before any runtime sees it, and lean
+    // offers none — so no listed command of that name can make it available.
+    if (isLean && (parseSideQuestionCommand(text) !== null || isUnsupportedLeanSlashInput(text, slashCommands.concat(allSlashCommands), listedSlashCommandNames))) {
+      useUIStore.getState().addToast({ type: 'info', message: t('agentProfile.commandUnavailable') })
+      return
+    }
     if ((!text && ((!attachments.length && !hasWorkspaceReferences) || isMemberSession)) || isWorkspaceMissing) return
 
     // Immediate local command: never enter the main turn, launch flow or queue.
@@ -971,17 +1003,30 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
     ]
 
     let targetSessionId = activeTabId!
-    if (showLaunchControls && activeLaunchWorkDir && launchBranch) {
+    // A chat can wait a long time for its first message, and the server switches
+    // the checkout to any launch branch that is not the current one. A branch the
+    // controls chose on their own is decided again now, against the checkout as it
+    // is, so a stale choice cannot put the repository back where it was.
+    let resolvedLaunchBranch = launchBranch
+    if (showLaunchControls && activeLaunchWorkDir && launchBranch && launchControlsRef.current) {
+      setLaunchTransitioning(true)
+      try {
+        resolvedLaunchBranch = await launchControlsRef.current.resolveLaunchBranch()
+      } finally {
+        setLaunchTransitioning(false)
+      }
+    }
+    if (showLaunchControls && activeLaunchWorkDir && resolvedLaunchBranch) {
       const shouldReplaceForRepositoryLaunch =
         launchUseWorktree ||
-        (gitInfo?.branch ? launchBranch !== gitInfo.branch : true)
+        (gitInfo?.branch ? resolvedLaunchBranch !== gitInfo.branch : true)
       if (shouldReplaceForRepositoryLaunch) {
         setLaunchTransitioning(true)
         const placeholderSessionId = targetSessionId
         setPreparingTurn(placeholderSessionId, true)
         try {
           const newSessionId = await replaceEmptySession(activeLaunchWorkDir, {
-            branch: launchBranch,
+            branch: resolvedLaunchBranch,
             worktree: launchUseWorktree,
           })
           if (!newSessionId) {
@@ -1021,11 +1066,16 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
         displayAttachments: visibleAttachmentPayload,
       })
     }
-    invalidatePendingPastes()
     recordRecentSkills(mentions.flatMap(mention => mention.kind === 'skill' && mention.id ? [mention.id] : []))
     if (sendAsTeam) capabilityMenu.disarmAgentTeam()
-    setComposerInput('', [])
-    setComposerAttachments([])
+    // The send can wait for the launch branch to be read again. If the user moved
+    // to another chat meanwhile, the editor holds that chat's draft now, not what
+    // was just sent: leave it alone. (The sent chat's saved draft is cleared below.)
+    if (currentChatRef.current === activeTabId || currentChatRef.current === targetSessionId) {
+      invalidatePendingPastes()
+      setComposerInput('', [])
+      setComposerAttachments([])
+    }
     const chatStore = useChatStore.getState()
     chatStore.clearComposerDraft(activeTabId!)
     chatStore.clearRepositoryLaunchDraft(activeTabId!)
@@ -1284,13 +1334,44 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
           onSelect: () => openFromComposerSheet(() => contextUsageRef.current?.open()),
         },
       ] : []),
+      // A lean session's badge and info button left the toolbar: beside the
+      // model they squeezed its name to one letter. The mode is locked, so
+      // this row only opens what it includes.
+      ...(isLean ? [{
+        key: 'agentProfile',
+        icon: <Feather size={16} strokeWidth={1.75} aria-hidden="true" />,
+        label: t('agentProfile.label'),
+        value: t('agentProfile.lean'),
+        onSelect: () => openFromComposerSheet(() => agentProfileRef.current?.open()),
+      }] : []),
     ]
     : []
+
+  // Desktop: the quiet glyph (or, once writes run unattended, the named chip)
+  // sits first in the trailing group. A phone keeps it after the chips, where
+  // it only appears when some writes run unattended.
+  const permissionSelector = isMemberSession ? null : (
+    <PermissionModeSelector
+      lean={isLean}
+      ref={permissionSelectorRef}
+      sessionId={activeTabId ?? undefined}
+      workDir={resolvedWorkDir}
+      compact={useCompactControls}
+      trigger={isMobileComposer ? 'elevatedOnly' : 'quiet'}
+      // On the desktop the trigger sits at the right of the card: a menu that
+      // opened rightwards from it ran past the card and the window edge.
+      menuAlign={isMobileComposer ? 'left' : 'right'}
+    />
+  )
 
   const capabilityMenu = useCapabilityMenu({
     open: plusMenuOpen && !isMemberSession,
     cwd: referenceCwd,
     references: composerReferences,
+    lean: isLean,
+    // A lean conversation's mode is fixed; its row only says so. A phone's "+"
+    // sheet opens its own sheet from a settings row instead.
+    agentProfile: isLean && !isMobileComposer ? { value: 'lean' } : undefined,
     handlers: {
       onInsertMention: (reference) => {
         const cursorPos = composerRef.current?.getSelectionOffsets().start ?? inputRef.current.length
@@ -1657,6 +1738,15 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
             row's top inset separate the two — so the narrow layouts no longer
             need a band of their own either.
           */}
+          {/*
+            One row that never wraps. The leading group (the "+", the armed
+            chips, the run location) gives up width first and truncates the
+            location; the trailing group (permission, usage, model, voice, send)
+            keeps its own width. The row used to let the trailing group wrap
+            onto a second line when a lean badge and its info button were on it,
+            which left the first line's right half empty. The lean mode is now a
+            row of the "+" menu and, once chosen, a chip on the leading group.
+          */}
           <div
             data-testid="chat-input-toolbar"
             className={`flex min-w-0 items-center justify-between pt-1.5 ${isMobileComposer ? 'gap-1' : 'gap-2'}`}
@@ -1665,7 +1755,7 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
             <div
               data-testid="chat-input-toolbar-leading"
               hidden={dictationLive}
-              className={`flex min-w-0 shrink-0 items-center gap-1 ${showLocationInToolbar ? 'max-w-[55%]' : ''}`}
+              className={`flex min-w-0 items-center gap-1 ${isMobileComposer ? 'shrink-0' : 'shrink'}`}
             >
               {!isMemberSession && (
                 <>
@@ -1726,24 +1816,26 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
                     <AgentTeamChip touch={isMobileComposer} onRemove={capabilityMenu.disarmAgentTeam} />
                   ) : null}
 
-                  <div className="shrink-0">
-                    <PermissionModeSelector
-                      ref={permissionSelectorRef}
-                      sessionId={activeTabId ?? undefined}
-                      workDir={resolvedWorkDir}
-                      compact={useCompactControls}
-                      trigger={isMobileComposer ? 'elevatedOnly' : 'chip'}
-                    />
-                  </div>
+                  {isLean && !isMobileComposer ? <AgentProfileChip /> : null}
+
+                  {isMobileComposer ? <div className="shrink-0">{permissionSelector}</div> : null}
 
                   {showLocationInToolbar && (
                     <div data-testid="chat-input-toolbar-location" className="min-w-0 flex-1">
                       {embedLaunchControlsInToolbar ? (
                         <RepositoryLaunchControls
+                          // One instance per chat: what it holds (which branch it chose
+                          // itself, the context it read) belongs to this chat, and
+                          // ChatInput is reused as the user moves between empty chats.
+                          key={activeTabId}
+                          ref={launchControlsRef}
+                          visible={visible}
                           workDir={activeLaunchWorkDir}
                           onWorkDirChange={handleLaunchWorkDirChange}
                           branch={launchBranch}
                           onBranchChange={setLaunchBranch}
+                          branchAutomatic={launchBranchAutomatic}
+                          onBranchAutomaticChange={setLaunchBranchAutomatic}
                           useWorktree={launchUseWorktree}
                           onUseWorktreeChange={setLaunchUseWorktree}
                           onLaunchReadyChange={setLaunchReady}
@@ -1772,8 +1864,11 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
             <div
               data-testid="chat-input-toolbar-trailing"
               hidden={dictationLive}
-              className="flex min-w-0 flex-1 items-center justify-end gap-1"
+              className={isMobileComposer
+                ? 'flex min-w-0 flex-1 items-center justify-end gap-1'
+                : 'flex shrink-0 items-center justify-end gap-1'}
             >
+              {!isMobileComposer ? permissionSelector : null}
               {!isMemberSession && activeTabId && (
                 <ContextUsageIndicator
                   ref={contextUsageRef}
@@ -1790,6 +1885,12 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
                   }
                 />
               )}
+              {isMobileComposer && (
+                <AgentProfileControl
+                  ref={agentProfileRef}
+                  value={isLean ? 'lean' : 'standard'}
+                />
+              )}
               {!isMemberSession && activeTabId && (
                 <ModelSelector
                   ref={modelSelectorRef}
@@ -1797,7 +1898,7 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
                   lockedProviderId={sideChat ? runtimeSelection?.providerId ?? null : undefined}
                   disabled={isActive}
                   compact={useCompactControls}
-                  fluid
+                  fluid={isMobileComposer}
                 />
               )}
               <VoiceInputButton dictation={dictation} blocked={composerDisabled} mobile={isMobileComposer} />
@@ -1878,10 +1979,15 @@ export function ChatInput({ variant = 'default', compact = false, sessionId, vis
               />
             ) : (
               <RepositoryLaunchControls
+                key={activeTabId}
+                ref={launchControlsRef}
+                visible={visible}
                 workDir={activeLaunchWorkDir}
                 onWorkDirChange={handleLaunchWorkDirChange}
                 branch={launchBranch}
                 onBranchChange={setLaunchBranch}
+                branchAutomatic={launchBranchAutomatic}
+                onBranchAutomaticChange={setLaunchBranchAutomatic}
                 useWorktree={launchUseWorktree}
                 onUseWorktreeChange={setLaunchUseWorktree}
                 onLaunchReadyChange={setLaunchReady}

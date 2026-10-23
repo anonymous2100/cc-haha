@@ -51,6 +51,19 @@ describe('tabStore', () => {
     vi.mocked(sessionsApi.getSummary).mockReset().mockRejectedValue(new ApiError(404, 'Session not found'))
   })
 
+  it.each([undefined, 'lean'] as const)('restores legacy tabs with server-owned profile %s before activation', async (agentProfile) => {
+    const session = { ...historicalSummary(), ...(agentProfile ? { agentProfile } : {}) }
+    // Old tab fixtures contain no profile; the server is authoritative after a restart.
+    localStorage.setItem('cc-haha-open-tabs', JSON.stringify({ openTabs: [{ sessionId: session.id, title: session.title }], activeTabId: session.id }))
+    vi.mocked(sessionsApi.getSummary).mockResolvedValue(session)
+    await useTabStore.getState().restoreTabs()
+    const restored = useSessionStore.getState().sessions.find(item => item.id === session.id)
+    expect(restored?.agentProfile ?? 'standard').toBe(agentProfile ?? 'standard')
+    expect(useTabStore.getState().activeTabId).toBe(session.id)
+    useTabStore.getState().saveTabs()
+    expect(JSON.parse(localStorage.getItem('cc-haha-open-tabs')!).openTabs[0]).not.toHaveProperty('agentProfile')
+  })
+
   it.each([false, true])('preserves a confirmed model switch during tab restoration (historical=%s)', async (historical) => {
     const summary = historicalSummary()
     localStorage.setItem('cc-haha-open-tabs', JSON.stringify({
@@ -400,6 +413,44 @@ describe('tabStore', () => {
     await useSessionStore.getState().fetchSessions()
     expect(sessionsApi.list).toHaveBeenLastCalledWith({ view: 'sidebar', perProjectLimit: 6 })
     expect(useSessionStore.getState().sessions).toEqual([])
+  })
+
+  it('hydrates a restored session inside the recent page but outside the sidebar preview', async () => {
+    const restored = historicalSummary('restored-eighth-session')
+    const recent = Array.from({ length: 7 }, (_, index) => ({
+      ...historicalSummary(`newer-session-${index}`),
+      modifiedAt: '2026-08-01T00:00:00.000Z',
+    }))
+    useSessionStore.setState({ sessions: recent.slice(0, 6) })
+    localStorage.setItem('cc-haha-open-tabs', JSON.stringify({
+      openTabs: [{ sessionId: restored.id, title: 'Saved title', type: 'session' }],
+      activeTabId: restored.id,
+    }))
+    vi.mocked(sessionsApi.list)
+      .mockResolvedValueOnce({ sessions: [...recent, restored], total: 8 })
+      .mockResolvedValue({ sessions: recent.slice(0, 6), total: 8 })
+    let metadataAtActivation: unknown
+    const unsubscribe = useTabStore.subscribe((state) => {
+      if (state.activeTabId === restored.id) {
+        metadataAtActivation = useSessionStore.getState().sessions.find((session) => session.id === restored.id)
+      }
+    })
+    try {
+      await useTabStore.getState().restoreTabs()
+    } finally {
+      unsubscribe()
+    }
+
+    expect(metadataAtActivation).toEqual(restored)
+    expect(sessionsApi.getSummary).not.toHaveBeenCalled()
+    expect(useSessionStore.getState().historicalSessionIds).toEqual(new Set([restored.id]))
+    expect(useSessionStore.getState().sessions).not.toContainEqual(recent[6])
+    await useSessionStore.getState().fetchSessions()
+    expect(useSessionStore.getState().sessions).toContainEqual(restored)
+    expect(useTabStore.getState().tabs[0]?.title).toBe(restored.title)
+    useTabStore.getState().closeTab(restored.id)
+    await useSessionStore.getState().fetchSessions()
+    expect(useSessionStore.getState().sessions).not.toContainEqual(restored)
   })
 
   it('restores un-migrated retired Trace tabs as the traced session chat tab', async () => {

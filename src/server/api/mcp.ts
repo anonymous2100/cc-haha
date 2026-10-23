@@ -36,6 +36,7 @@ import { getCwd, runWithCwdOverride } from '../../utils/cwd.js'
 import { normalizePathForConfigKey } from '../../utils/path.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 import { conversationService } from '../services/conversationService.js'
+import { sessionService } from '../services/sessionService.js'
 
 type McpEditableConfigDto =
   | {
@@ -86,7 +87,7 @@ type McpMutationBody = {
 
 type McpSessionSyncDto = {
   applied: boolean
-  reason?: 'not_running' | 'different_project' | 'failed' | 'no_session'
+  reason?: 'not_running' | 'different_project' | 'failed' | 'no_session' | 'lean_profile'
   error?: string
 }
 
@@ -95,6 +96,10 @@ type McpServerIdentity = {
   scope: string
   projectPath?: string
 }
+
+type McpSessionAction =
+  | { subtype: 'mcp_reconnect'; serverName: string }
+  | { subtype: 'mcp_toggle'; serverName: string; enabled: boolean; alreadyPersisted: true }
 
 const EDITABLE_SCOPES = new Set<ConfigScope>(['local', 'project', 'user'])
 
@@ -119,10 +124,10 @@ function parseScopeParam(value: string | null): ConfigScope {
   }
 }
 
-async function syncMcpToggleToSession(
+async function syncMcpActionToSession(
   sessionId: string | undefined,
   server: McpServerIdentity,
-  enabled: boolean,
+  action: McpSessionAction,
 ): Promise<McpSessionSyncDto> {
   if (!sessionId) return { applied: false, reason: 'no_session' }
   if (!conversationService.hasSession(sessionId)) {
@@ -149,10 +154,15 @@ async function syncMcpToggleToSession(
     }
   }
 
+  // A lean CLI has no MCP runtime; asking it would only come back as an
+  // error that the desktop reports as a failed chat sync.
+  const launchInfo = await sessionService.getSessionLaunchInfo(sessionId).catch(() => null)
+  if (launchInfo?.agentProfile === 'lean') return { applied: false, reason: 'lean_profile' }
+
   try {
     await conversationService.requestControl(
       sessionId,
-      { subtype: 'mcp_toggle', serverName: server.name, enabled, alreadyPersisted: true },
+      action,
       120_000,
     )
     return { applied: true }
@@ -670,16 +680,16 @@ async function deleteServer(name: string, url: URL): Promise<Response> {
 // enable's connection. Persisting a disable never waits behind a slow probe.
 const enableProbeQueues = new Map<string, Promise<Response>>()
 
-async function syncMcpToggleToSessions(
+async function syncMcpActionToSessions(
   sessionId: string | undefined,
   server: McpServerIdentity,
-  enabled: boolean,
+  action: McpSessionAction,
 ): Promise<McpSessionSyncDto> {
   const sessionIds = [...new Set([
     ...(sessionId ? [sessionId] : []),
     ...conversationService.getActiveSessions(),
   ])]
-  const results = await Promise.all(sessionIds.map(id => syncMcpToggleToSession(id, server, enabled)))
+  const results = await Promise.all(sessionIds.map(id => syncMcpActionToSession(id, server, action)))
   const failure = results.find(result => result.reason === 'failed')
   return failure ?? (sessionId ? results[sessionIds.indexOf(sessionId)]! : { applied: false, reason: 'no_session' })
 }
@@ -694,7 +704,9 @@ async function toggleServer(name: string, sessionId?: string): Promise<Response>
   const enabled = isMcpServerDisabledForExecution(name)
   setMcpServerEnabled(name, enabled)
   if (!enabled) await clearServerCache(name, existing).catch(() => {})
-  const sessionSync = await syncMcpToggleToSessions(sessionId, serverIdentity, enabled)
+  const sessionSync = await syncMcpActionToSessions(sessionId, serverIdentity, {
+    subtype: 'mcp_toggle', serverName: name, enabled, alreadyPersisted: true,
+  })
 
   if (!enabled) {
     const updated = serializeServerSnapshot(name, existing)
@@ -718,7 +730,7 @@ async function toggleServer(name: string, sessionId?: string): Promise<Response>
   return next
 }
 
-async function reconnectServer(name: string): Promise<Response> {
+async function reconnectServer(name: string, sessionId?: string): Promise<Response> {
   const existing = await resolveServerForRuntimeAction(name)
   if (!existing) {
     throw ApiError.notFound(`MCP server not found: ${name}`)
@@ -735,6 +747,12 @@ async function reconnectServer(name: string): Promise<Response> {
   const result = await reconnectMcpServerImpl(name, existing)
   await clearServerCache(name, existing).catch(() => {})
 
+  // The settings probe runs in the server process. Each active conversation
+  // owns a separate CLI connection and tool pool, so it must reconnect too.
+  const sessionSync = await syncMcpActionToSessions(sessionId, getServerIdentity(name, existing), {
+    subtype: 'mcp_reconnect', serverName: name,
+  })
+
   const server = await serializeServerWithLiveStatus(name, existing)
   const statusDetail =
     result.client.type === 'failed' && 'error' in result.client ? result.client.error : undefined
@@ -744,6 +762,7 @@ async function reconnectServer(name: string): Promise<Response> {
       ...server,
       ...(statusDetail ? { statusDetail } : {}),
     },
+    sessionSync,
   })
 }
 
@@ -792,7 +811,7 @@ export async function handleMcpApi(
       }
 
       if (req.method === 'POST' && serverName && action === 'reconnect') {
-        return reconnectServer(serverName)
+        return reconnectServer(serverName, optionalString(body?.sessionId))
       }
 
       throw new ApiError(405, `Method ${req.method} not allowed`, 'METHOD_NOT_ALLOWED')

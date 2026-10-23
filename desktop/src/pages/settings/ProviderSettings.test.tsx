@@ -195,6 +195,9 @@ describe('active sponsor providers', () => {
     expect(sponsor.nextElementSibling).toBe(dialog.getByRole('button', { name: 'Atlas Cloud' }))
     expect(within(sponsor).getByText('New')).toBeInTheDocument()
     expect(within(sponsor).getByLabelText('Sponsor')).toBeInTheDocument()
+    expect(sponsor.querySelector('img')?.getAttribute('src')).toContain('modelflare-logo')
+    expect(dialog.getByRole('button', { name: 'AruHub' }).querySelector('img')?.getAttribute('src')).toContain('aruhub-logo')
+    expect(dialog.getByRole('button', { name: 'Atlas Cloud' }).querySelector('img')).toBeNull()
     expect(dialog.queryByRole('button', { name: 'ApiSmart' })).not.toBeInTheDocument()
 
     fireEvent.click(sponsor)
@@ -622,6 +625,7 @@ describe('OpenCode Go provider', () => {
         { id: 'glm-5.3', ownedBy: 'opencode' },
         { id: 'minimax-m3', ownedBy: 'opencode' },
         { id: 'grok-4.6', ownedBy: 'opencode' },
+        { id: 'gemini-4-argon-contributor', ownedBy: 'opencode' },
       ],
     })
     render(<ProviderSettings />)
@@ -636,7 +640,7 @@ describe('OpenCode Go provider', () => {
 
     // The endpoint is the only thing that distinguishes these models, so it is what
     // the picker groups by — this is how the routing stays visible while choosing.
-    for (const endpoint of ['/chat/completions', '/messages', '/responses']) {
+    for (const endpoint of ['/chat/completions', '/messages', '/responses', ':generateContent']) {
       expect(await screen.findByText(endpoint)).toBeInTheDocument()
     }
   })

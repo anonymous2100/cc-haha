@@ -14,6 +14,7 @@ import { normalizePathForConfigKey } from '../../utils/path.js'
 import * as mcpHostPreflight from '../services/mcpHostPreflight.js'
 import { handleMcpApi } from '../api/mcp.js'
 import { conversationService } from '../services/conversationService.js'
+import { sessionService } from '../services/sessionService.js'
 
 let tmpDir: string
 let projectRoot: string
@@ -1002,6 +1003,60 @@ describe('MCP API', () => {
     })
   })
 
+  it('does not send MCP toggles to lean sessions and reports them as not applicable', async () => {
+    const create = makeRequest('POST', '/api/mcp', {
+      cwd: projectRoot, name: 'lean-sync', scope: 'local',
+      config: { type: 'stdio', command: 'mock', args: [], env: {} },
+    })
+    await handleMcpApi(create.req, create.url, create.segments)
+    conversationService.getActiveSessions = () => ['lean-1', 'standard-1']
+    conversationService.hasSession = () => true
+    conversationService.getSessionWorkDir = () => projectRoot
+    const requestControl = mock(async () => ({}))
+    conversationService.requestControl = requestControl as typeof conversationService.requestControl
+    const launchInfoSpy = spyOn(sessionService, 'getSessionLaunchInfo').mockImplementation((async (id: string) => (
+      { agentProfile: id === 'lean-1' ? 'lean' : 'standard' }
+    )) as unknown as typeof sessionService.getSessionLaunchInfo)
+    try {
+      const leanToggle = makeRequest('POST', '/api/mcp/lean-sync/toggle', { cwd: projectRoot, sessionId: 'lean-1' })
+      const leanBody = await (await handleMcpApi(leanToggle.req, leanToggle.url, leanToggle.segments)).json()
+      expect(leanBody.sessionSync).toEqual({ applied: false, reason: 'lean_profile' })
+      // The persisted toggle still happened and the standard session in the same project was synced.
+      expect(leanBody.server.enabled).toBe(false)
+      expect(requestControl.mock.calls.map(call => call[0])).toEqual(['standard-1'])
+
+      requestControl.mockClear()
+      const standardToggle = makeRequest('POST', '/api/mcp/lean-sync/toggle', { cwd: projectRoot, sessionId: 'standard-1' })
+      const standardBody = await (await handleMcpApi(standardToggle.req, standardToggle.url, standardToggle.segments)).json()
+      expect(standardBody.sessionSync).toEqual({ applied: true })
+      expect(requestControl.mock.calls.map(call => call[0])).toEqual(['standard-1'])
+    } finally {
+      launchInfoSpy.mockRestore()
+    }
+  })
+
+  it('syncs a session whose launch info cannot be read as the standard one it may be', async () => {
+    const create = makeRequest('POST', '/api/mcp', {
+      cwd: projectRoot, name: 'unreadable-launch-info', scope: 'local',
+      config: { type: 'stdio', command: 'mock', args: [], env: {} },
+    })
+    await handleMcpApi(create.req, create.url, create.segments)
+    conversationService.getActiveSessions = () => ['unreadable-1']
+    conversationService.hasSession = () => true
+    conversationService.getSessionWorkDir = () => projectRoot
+    const requestControl = mock(async () => ({}))
+    conversationService.requestControl = requestControl as typeof conversationService.requestControl
+    const launchInfoSpy = spyOn(sessionService, 'getSessionLaunchInfo').mockRejectedValue(new Error('transcript unreadable'))
+    try {
+      const toggle = makeRequest('POST', '/api/mcp/unreadable-launch-info/toggle', { cwd: projectRoot, sessionId: 'unreadable-1' })
+      const body = await (await handleMcpApi(toggle.req, toggle.url, toggle.segments)).json()
+      expect(body.sessionSync).toEqual({ applied: true })
+      expect(requestControl.mock.calls.map(call => call[0])).toEqual(['unreadable-1'])
+    } finally {
+      launchInfoSpy.mockRestore()
+    }
+  })
+
   it('does not sync a project-specific toggle into a session from another project', async () => {
     const otherProject = path.join(tmpDir, 'other-project')
     await fs.mkdir(otherProject, { recursive: true })
@@ -1081,6 +1136,58 @@ describe('MCP API', () => {
     const body = await reconnectRes.json()
     expect(body.server.name).toBe(pluginServerName)
     expect(body.server.scope).toBe('dynamic')
+  })
+
+  it('reconnects a late-starting MCP server in every matching running session', async () => {
+    const create = makeRequest('POST', '/api/mcp', {
+      cwd: projectRoot, name: 'late-server', scope: 'local',
+      config: { type: 'http', url: 'http://127.0.0.1:1/mcp', headers: {} },
+    })
+    await handleMcpApi(create.req, create.url, create.segments)
+    conversationService.getActiveSessions = () => ['current', 'history', 'other-project', 'lean']
+    conversationService.hasSession = () => true
+    conversationService.getSessionWorkDir = id => id === 'other-project' ? tmpDir : projectRoot
+    const requestControl = mock(async () => ({}))
+    conversationService.requestControl = requestControl as typeof conversationService.requestControl
+    const launchInfoSpy = spyOn(sessionService, 'getSessionLaunchInfo').mockImplementation((async (id: string) => (
+      { agentProfile: id === 'lean' ? 'lean' : 'standard' }
+    )) as unknown as typeof sessionService.getSessionLaunchInfo)
+    reconnectSpy = spyOn(mcpClient, 'reconnectMcpServerImpl').mockImplementation(async (name, config) => ({
+      client: { name, config, type: 'connected', client: {} as never, capabilities: {}, cleanup: async () => {} },
+      tools: [], commands: [],
+    }))
+    try {
+      const reconnect = makeRequest('POST', '/api/mcp/late-server/reconnect', { cwd: projectRoot, sessionId: 'current' })
+      const response = await handleMcpApi(reconnect.req, reconnect.url, reconnect.segments)
+      expect(response.status).toBe(200)
+      expect((await response.json()).sessionSync).toEqual({ applied: true })
+      expect(requestControl.mock.calls.map(call => call[0])).toEqual(['current', 'history'])
+      expect(requestControl).toHaveBeenCalledWith('current', { subtype: 'mcp_reconnect', serverName: 'late-server' }, 120_000)
+    } finally {
+      launchInfoSpy.mockRestore()
+    }
+  })
+
+  it('reports a session reconnect failure even when the settings probe connects', async () => {
+    const create = makeRequest('POST', '/api/mcp', {
+      cwd: projectRoot, name: 'stale-session', scope: 'local',
+      config: { type: 'http', url: 'http://127.0.0.1:1/mcp', headers: {} },
+    })
+    await handleMcpApi(create.req, create.url, create.segments)
+    conversationService.getActiveSessions = () => ['current']
+    conversationService.hasSession = () => true
+    conversationService.getSessionWorkDir = () => projectRoot
+    conversationService.requestControl = (async () => { throw new Error('session MCP reconnect failed') }) as typeof conversationService.requestControl
+    reconnectSpy = spyOn(mcpClient, 'reconnectMcpServerImpl').mockImplementation(async (name, config) => ({
+      client: { name, config, type: 'connected', client: {} as never, capabilities: {}, cleanup: async () => {} },
+      tools: [], commands: [],
+    }))
+    const reconnect = makeRequest('POST', '/api/mcp/stale-session/reconnect', { cwd: projectRoot, sessionId: 'current' })
+    const response = await handleMcpApi(reconnect.req, reconnect.url, reconnect.segments)
+    expect(await response.json()).toMatchObject({
+      server: { status: 'connected' },
+      sessionSync: { applied: false, reason: 'failed', error: 'session MCP reconnect failed' },
+    })
   })
 
   it('returns a failed server state when reconnect preflight fails on the host machine', async () => {

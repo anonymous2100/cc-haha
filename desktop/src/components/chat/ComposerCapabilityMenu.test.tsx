@@ -111,17 +111,27 @@ function fixtureSections(): CapabilityMenuSection[] {
       id: 'more',
       title: 'More tools',
       showTitle: false,
-      items: [{
-        key: 'more',
-        label: 'More tools',
-        icon: { kind: 'slash' },
-        children: [{
+      items: [
+        {
+          key: 'agents',
+          label: 'Agents',
+          icon: { kind: 'slash' },
+          count: 1,
+          children: [{
+            key: 'agent:debugger',
+            label: 'debugger',
+            description: 'Debug failures',
+            icon: { kind: 'slash' },
+            action: { type: 'insertSlashText', command: 'agent debugger' },
+          }],
+        },
+        {
           key: 'slash-commands',
           label: 'Slash commands',
           icon: { kind: 'slash' },
           action: { type: 'slashTrigger' },
-        }],
-      }],
+        },
+      ],
       searchOnly: [{ key: 'plugin:video', label: 'Video Studio', icon: { kind: 'slash' }, action: { type: 'insertMention', reference: videoPlugin } }],
     },
   ]
@@ -155,8 +165,10 @@ describe('ComposerCapabilityMenu', () => {
     const { onAction } = renderMenu()
     expect(within(rootList()).getByText('For this task')).toBeInTheDocument()
     expect(within(rootList()).getByText('How it runs')).toBeInTheDocument()
-    // More is one row; its group needs no visible title.
+    // The trailing tools group stands on its hairline without a title.
     expect(within(rootList()).queryByText('More tools', { selector: '[role="presentation"]' })).not.toBeInTheDocument()
+    fireEvent.click(within(rootList()).getByRole('option', { name: /Slash commands/ }))
+    expect(onAction).toHaveBeenCalledWith({ type: 'slashTrigger' })
 
     fireEvent.click(screen.getByRole('option', { name: /Add files or photos/ }))
     expect(onAction).toHaveBeenCalledWith({ type: 'attachment' })
@@ -224,7 +236,7 @@ describe('ComposerCapabilityMenu', () => {
     const { onAction, onClose } = renderMenu()
     const input = searchInput()
 
-    // Root order: Skills → Connectors → Add files → Computer Use → More.
+    // Root order: Skills → Connectors → Add files → Computer Use → Agents → Slash commands.
     fireEvent.keyDown(input, { key: 'ArrowRight' })
     const flyout = screen.getByTestId('capability-flyout')
     expect(input).toHaveAttribute('aria-controls', 'cap-sub-list')
@@ -340,11 +352,11 @@ it('opens categories in place when the window has no room for a side panel', () 
 
 it('drills in place inside the phone sheet and backs up one level per Escape', () => {
   const { onClose } = renderMenu({ presentation: 'sheet' })
-  fireEvent.click(screen.getByRole('option', { name: /More tools/ }))
+  fireEvent.click(screen.getByRole('option', { name: /Agents/ }))
   expect(screen.queryByTestId('capability-flyout')).not.toBeInTheDocument()
-  expect(screen.getByRole('option', { name: /Slash commands/ })).toBeInTheDocument()
+  expect(screen.getByRole('option', { name: /debugger/ })).toBeInTheDocument()
   fireEvent.keyDown(searchInput(), { key: 'Escape' })
-  expect(screen.getByRole('option', { name: /More tools/ })).toBeInTheDocument()
+  expect(screen.getByRole('option', { name: /Agents/ })).toBeInTheDocument()
   expect(onClose).not.toHaveBeenCalled()
 })
 
@@ -366,4 +378,47 @@ it('swaps a logo that fails to load for its fallback and keeps absolute icon URL
   fireEvent.error(logo)
   expect(github.querySelector('img')).toBeNull()
   expect(github.querySelector('svg.lucide-plug')).toBeInTheDocument()
+})
+
+describe('the Agent mode row', () => {
+  const modeSections = (locked: boolean, value = 'standard'): CapabilityMenuSection[] => [{
+    id: 'run',
+    title: 'How it runs',
+    showTitle: true,
+    items: [{
+      key: 'agent-profile',
+      label: 'Agent mode',
+      icon: { kind: 'slash' },
+      choice: {
+        value,
+        locked,
+        options: [
+          { value: 'standard', label: 'Standard', action: { type: 'setAgentProfile', profile: 'standard' } },
+          { value: 'lean', label: 'Lean', action: { type: 'setAgentProfile', profile: 'lean' } },
+        ],
+      },
+      detail: [{ text: 'Choose before the first message.' }, { label: 'Unavailable', text: 'Connectors (MCP).' }],
+    }],
+  }]
+
+  it('picks a mode from the segmented control without running the row, and explains it underneath', () => {
+    const { onAction } = renderMenu({ sections: modeSections(false) })
+    const group = screen.getByRole('radiogroup', { name: 'Agent mode' })
+    expect(within(group).getByRole('radio', { name: 'Standard' })).toBeChecked()
+    fireEvent.click(within(group).getByRole('radio', { name: 'Lean' }))
+    expect(onAction).toHaveBeenCalledTimes(1)
+    expect(onAction).toHaveBeenCalledWith({ type: 'setAgentProfile', profile: 'lean' })
+    const detail = screen.getByTestId('agent-profile-detail')
+    expect(detail).toHaveTextContent('Choose before the first message.')
+    expect(detail).toHaveTextContent('Unavailable Connectors (MCP).')
+  })
+
+  it('shows a locked row as it is, with nothing to pick', () => {
+    const { onAction } = renderMenu({ sections: modeSections(true, 'lean') })
+    const group = screen.getByRole('radiogroup', { name: 'Agent mode' })
+    expect(within(group).getByRole('radio', { name: 'Lean' })).toBeChecked()
+    for (const radio of within(group).getAllByRole('radio')) expect(radio).toBeDisabled()
+    fireEvent.click(within(group).getByRole('radio', { name: 'Standard' }))
+    expect(onAction).not.toHaveBeenCalled()
+  })
 })

@@ -7,7 +7,7 @@
  * came back to the model in the next request, which no UI frame can prove.
  */
 
-import { decideReply, type MockContentBlock, type MockRequest } from './scriptedModel'
+import { decideReply, type MockContentBlock, type MockRequest, type MockReply } from './scriptedModel'
 import { GEMINI_IMAGE_ASPECT_RATIOS } from '../../../src/tools/ImageGenTool/aspectRatios'
 
 export type RecordedRequest = {
@@ -26,6 +26,7 @@ export type MockLlmServer = {
   url: string
   requests: RecordedRequest[]
   imageRequests: Array<{ path: string; body: Record<string, unknown>; headers: Headers }>
+  searchRequests: Array<{ body: Record<string, unknown>; headers: Headers }>
   stop(): Promise<void>
 }
 
@@ -124,9 +125,9 @@ function streamReply(
   })
 }
 
-function handleMessages(record: RecordedRequest): Response {
+function handleMessages(record: RecordedRequest, replyFor: (request: MockRequest) => MockReply): Response {
   const request = record.body
-  const reply = decideReply(request)
+  const reply = replyFor(request)
   if (reply.kind === 'error') {
     record.outcome = 'error'
     return Response.json(
@@ -152,9 +153,10 @@ function handleMessages(record: RecordedRequest): Response {
   })
 }
 
-export function startMockLlmServer(): MockLlmServer {
+export function startMockLlmServer(replyFor = decideReply): MockLlmServer {
   const requests: RecordedRequest[] = []
   const imageRequests: MockLlmServer['imageRequests'] = []
+  const searchRequests: MockLlmServer['searchRequests'] = []
   const server = Bun.serve({
     hostname: '127.0.0.1',
     port: 0,
@@ -164,6 +166,11 @@ export function startMockLlmServer(): MockLlmServer {
         return Response.json({ data: [{ type: 'model', id: MODEL_FALLBACK, display_name: 'Mock model' }], has_more: false })
       }
       if (req.method !== 'POST') return new Response('not found', { status: 404 })
+
+      if (path === '/v1/tools/search') {
+        searchRequests.push({ body: await req.json() as Record<string, unknown>, headers: req.headers })
+        return Response.json({ results: [{ title: 'DeepSeek fixture', url: 'https://example.com/search-fixture', summary: 'DEEPSEEK_SUMMARY_REACHED_MODEL' }] })
+      }
 
       const isGeminiLiteImage = path === '/v1beta/models/gemini-3.1-flash-lite-image:generateContent'
       const isGeminiImage = path === '/v1beta/models/mock-image:generateContent' || isGeminiLiteImage
@@ -202,7 +209,7 @@ export function startMockLlmServer(): MockLlmServer {
       if (path.endsWith('/v1/messages')) {
         const record: RecordedRequest = { path, stream: body.stream === true, body, receivedAt: Date.now(), outcome: 'pending' }
         requests.push(record)
-        return handleMessages(record)
+        return handleMessages(record, replyFor)
       }
       return new Response('not found', { status: 404 })
     },
@@ -212,6 +219,7 @@ export function startMockLlmServer(): MockLlmServer {
     url: `http://127.0.0.1:${server.port}`,
     requests,
     imageRequests,
+    searchRequests,
     async stop() {
       await server.stop(true)
     },

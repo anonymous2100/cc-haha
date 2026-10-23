@@ -1,3 +1,4 @@
+import { filterAgentProfileTools, validateAgentProfileControlRequest, validateAgentProfileInitialize } from '../utils/agentProfile.js'
 import { createSessionMessageInbox, isPendingSessionMessage, sessionMessageUuid } from '../utils/sessionMessageInbox.js'
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import { feature } from 'bun:bundle'
@@ -267,6 +268,7 @@ import {
 } from 'src/services/mcp/utils.js'
 import { setupVscodeSdkMcp } from 'src/services/mcp/vscodeSdkMcp.js'
 import { getAllMcpConfigs } from 'src/services/mcp/config.js'
+import { refreshGlobalConfigFromDisk } from 'src/utils/config.js'
 import {
   isQualifiedForGrove,
   checkGroveForNonInteractive,
@@ -341,6 +343,7 @@ import { asSessionId } from 'src/types/ids.js'
 import { jsonStringify } from '../utils/slowOperations.js'
 import { skillChangeDetector } from '../utils/skills/skillChangeDetector.js'
 import { getCommands, clearCommandsCache } from '../commands.js'
+import { filterCommandsForHeadlessMode } from '../commands/headless.js'
 import {
   isBareMode,
   isEnvTruthy,
@@ -1728,7 +1731,7 @@ function runHeadlessStreaming(
         allTools = [...allTools, syntheticOutputResult.tool]
       }
     }
-    return allTools
+    return filterAgentProfileTools(allTools)
   }
 
   // Bridge handle for remote-control (SDK control message).
@@ -1982,7 +1985,7 @@ function runHeadlessStreaming(
   const idleTimeout = createIdleTimeoutManager(() => !running)
 
   // Mutable commands and agents for hot reloading
-  let currentCommands = commands
+  let currentCommands = filterCommandsForHeadlessMode(commands)
   let currentAgents = agents
 
   // Clear all plugin-related caches, reload commands/agents/hooks.
@@ -2002,7 +2005,7 @@ function runHeadlessStreaming(
     // Headless-specific: currentCommands/currentAgents are local mutable refs
     // captured by the query loop (REPL uses AppState instead). getCommands is
     // fresh because refreshActivePlugins cleared its cache.
-    currentCommands = await getCommands(cwd())
+    currentCommands = filterCommandsForHeadlessMode(await getCommands(cwd()))
 
     // Preserve SDK-provided agents (--agents CLI flag or SDK initialize
     // control_request) — both inject via parseAgentsFromJson with
@@ -2059,7 +2062,7 @@ function runHeadlessStreaming(
   const unsubscribeSkillChanges = skillChangeDetector.subscribe(() => {
     clearCommandsCache()
     void getCommands(cwd()).then(newCommands => {
-      currentCommands = newCommands
+      currentCommands = filterCommandsForHeadlessMode(newCommands)
     })
   })
 
@@ -2324,6 +2327,9 @@ function runHeadlessStreaming(
               prompt: input,
               promptUuid: cmd.uuid,
               isMeta: cmd.isMeta,
+              // Same derivation as handlePromptSubmit: a task notification that
+              // starts its own turn is not the user's input.
+              origin: cmd.origin ?? (cmd.mode === 'task-notification' ? ({ kind: 'task-notification' } as const) : undefined),
               cwd: cwd(),
               tools: allTools,
               verbose: options.verbose,
@@ -3074,6 +3080,11 @@ function runHeadlessStreaming(
           sendControlResponseSuccess(message)
           break // exits for-await → falls through to inputClosed=true drain below
         } else if (message.request.subtype === 'initialize') {
+          const profileError = validateAgentProfileInitialize(message.request)
+          if (profileError) {
+            sendControlResponseError(message, profileError)
+            continue
+          }
           // SDK MCP server names from the initialize message
           // Populated by both browser and ProcessTransport sessions
           if (
@@ -3129,6 +3140,11 @@ function runHeadlessStreaming(
             void run()
           }
         } else if (message.request.subtype === 'set_permission_mode') {
+          const profileError = validateAgentProfileControlRequest(message.request.subtype, message.request)
+          if (profileError) {
+            sendControlResponseError(message, profileError)
+            continue
+          }
           const m = message.request // for typescript (TODO: use readonly types to avoid this)
           setAppState(prev => ({
             ...prev,
@@ -3269,6 +3285,11 @@ function runHeadlessStreaming(
           }
           sendControlResponseSuccess(message)
         } else if (message.request.subtype === 'mcp_set_servers') {
+          const profileError = validateAgentProfileControlRequest(message.request.subtype, message.request)
+          if (profileError) {
+            sendControlResponseError(message, profileError)
+            continue
+          }
           const { response, sdkServersChanged } = await applyMcpServerChanges(
             message.request.servers,
           )
@@ -3309,7 +3330,7 @@ function runHeadlessStreaming(
               loadAllPluginsCacheOnly(),
             ])
             if (cmdsR.status === 'fulfilled') {
-              currentCommands = cmdsR.value
+              currentCommands = filterCommandsForHeadlessMode(cmdsR.value)
             } else {
               logError(cmdsR.reason)
             }
@@ -3347,6 +3368,7 @@ function runHeadlessStreaming(
             sendControlResponseError(message, errorMessage(error))
           }
         } else if (message.request.subtype === 'mcp_reconnect') {
+          refreshGlobalConfigFromDisk()
           const currentAppState = getAppState()
           const { serverName } = message.request
           elicitationRegistered.delete(serverName)
@@ -4113,6 +4135,11 @@ function runHeadlessStreaming(
             sendControlResponseError(message, result.message)
           }
         } else if (message.request.subtype === 'send_agent_message') {
+          const profileError = validateAgentProfileControlRequest(message.request.subtype, message.request)
+          if (profileError) {
+            sendControlResponseError(message, profileError)
+            continue
+          }
           const agentId = message.request.agent_id.trim()
           const content = message.request.content.trim()
           if (!agentId || !content) {

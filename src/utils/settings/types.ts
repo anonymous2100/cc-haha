@@ -470,6 +470,10 @@ export const SettingsSchema = lazySchema(() =>
         .nullable()
         .optional()
         .describe('Maximum concurrent ordinary subagents in one CLI process. Missing or null means unlimited.'),
+      leanModeEnabled: z
+        .boolean()
+        .optional()
+        .describe('Show the Standard / Lean selector for new desktop chats. Default: false. Existing sessions keep their profile.'),
       agentTeamsEnabled: z
         .boolean()
         .optional()
@@ -694,15 +698,19 @@ export const SettingsSchema = lazySchema(() =>
       webSearch: z
         .object({
           mode: z
-            .enum(['auto', 'anthropic', 'tavily', 'brave', 'disabled'])
+            .enum(['auto', 'anthropic', 'tavily', 'brave', 'deepseek', 'disabled'])
             .optional()
             .describe(
-              'WebSearch backend selection. auto uses native Claude web search for Claude model names, then Tavily, then Brave.',
+              'WebSearch backend selection. auto uses supported native search (Claude or official DeepSeek Anthropic endpoint), then Tavily, Brave, DeepSeek.',
             ),
           tavilyApiKey: z
             .string()
             .optional()
             .describe('Tavily API key for WebSearch fallback'),
+          deepseekApiKey: z
+            .string()
+            .optional()
+            .describe('DeepSeek API key for the standalone Search API'),
           braveApiKey: z
             .string()
             .optional()

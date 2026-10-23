@@ -135,7 +135,9 @@ export function anthropicToOpenaiChat(
       result.reasoning_effort = 'high'
     }
     if (options.passThinkingToggle) {
-      result.thinking = { type: body.thinking.type }
+      result.thinking = {
+        type: body.thinking.type === 'adaptive' ? 'enabled' : body.thinking.type,
+      }
     }
   }
   const outputConfigEffort = normalizeOpenAIReasoningEffort(body.output_config?.effort)
@@ -556,7 +558,7 @@ function documentContentToParts(
  * string when neither is set, otherwise a newline-terminated prefix so the
  * document body follows on its own line.
  */
-function documentProvenanceText(document: { title?: string; context?: string }): string {
+export function documentProvenanceText(document: { title?: string; context?: string }): string {
   const lines = [
     ...(document.title ? [`[Document: ${document.title}]`] : []),
     ...(document.context ? [`[Document context: ${document.context}]`] : []),
@@ -579,7 +581,7 @@ function toImageUrl(block: Extract<AnthropicContentBlock, { type: 'image' }>): {
  * Flatten an Anthropic search_result block into its visible text (title,
  * body, source URL), matching the official schema where `source` is a string.
  */
-function searchResultToText(block: Extract<AnthropicContentBlock, { type: 'search_result' }>): string {
+export function searchResultToText(block: Extract<AnthropicContentBlock, { type: 'search_result' }>): string {
   const contentText = Array.isArray(block.content)
     ? block.content.filter((part): part is { type: 'text'; text: string } => part.type === 'text').map(part => part.text)
     : []
